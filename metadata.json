@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Landing Page (Formulario) - Mi Local",
+  "description": "Landing page de Mi Local para poder captar a los primeros clientes y propietarios para un MVP funcional",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
