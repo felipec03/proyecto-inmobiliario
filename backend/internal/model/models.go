@@ -53,20 +53,31 @@ const (
 )
 
 type UserProfile struct {
-	ID       string     `json:"id"`
-	Name     string     `json:"name"`
-	Email    string     `json:"email"`
-	Type     UserType   `json:"type"`
-	Level    int        `json:"level"`
-	SubType  string     `json:"subType"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Email        string   `json:"email"`
+	Type         UserType `json:"type"`
+	Level        int      `json:"level"`
+	SubType      string   `json:"subType"`
+	PasswordHash string   `json:"-"`
+}
+
+type UserProfileResponse struct {
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Email   string   `json:"email"`
+	Type    UserType `json:"type"`
+	Level   int      `json:"level"`
+	SubType string   `json:"subType"`
 }
 
 type Document struct {
-	ID     string    `json:"id"`
-	UserID string    `json:"userId"`
-	Name   string    `json:"name"`
-	Type   DocType   `json:"type"`
-	Status DocStatus `json:"status"`
+	ID       string    `json:"id"`
+	UserID   string    `json:"userId"`
+	Name     string    `json:"name"`
+	Type     DocType   `json:"type"`
+	Status   DocStatus `json:"status"`
+	FilePath string    `json:"filePath,omitempty"`
 }
 
 type CommercialSpecs struct {
@@ -129,14 +140,35 @@ type TrendPoint struct {
 	Growth float64 `json:"growth"`
 }
 
+type UserPreferences struct {
+	MaxBudget         float64 `json:"maxBudget"`
+	MinSize           float64 `json:"minSize"`
+	MaxSize           float64 `json:"maxSize"`
+	PreferredLocation string  `json:"preferredLocation"`
+}
+
 type MatchRequest struct {
-	PropertyID string `json:"propertyId"`
-	Rubro      string `json:"rubro"`
+	PropertyID      string           `json:"propertyId"`
+	Rubro           string           `json:"rubro"`
+	UserPreferences *UserPreferences `json:"userPreferences,omitempty"`
+}
+
+type FeatureContrib struct {
+	Dimension string  `json:"dimension"`
+	Label     string  `json:"label"`
+	Score     float64 `json:"score"`
+	Weight    float64 `json:"weight"`
+	MaxWeight float64 `json:"maxWeight"`
+	Ideal     float64 `json:"ideal"`
+	Actual    float64 `json:"actual"`
 }
 
 type MatchResponse struct {
-	Score   int      `json:"score"`
-	Details []string `json:"details"`
+	Score     float64         `json:"score"`
+	Permitted bool            `json:"permitted"`
+	SpecScore float64         `json:"specScore"`
+	UserScore float64         `json:"userScore"`
+	Breakdown []FeatureContrib `json:"breakdown"`
 }
 
 type AssessmentRequest struct {
@@ -158,6 +190,23 @@ type UpdateUserRequest struct {
 type ErrorResponse struct {
 	Error   string `json:"error"`
 	Message string `json:"message"`
+}
+
+type RegisterRequest struct {
+	Name     string   `json:"name"`
+	Email    string   `json:"email"`
+	Password string   `json:"password"`
+	Type     UserType `json:"type"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type AuthResponse struct {
+	Token string             `json:"token"`
+	User  UserProfileResponse `json:"user"`
 }
 
 func NewUserProfile(id, name, email string, userType UserType) *UserProfile {

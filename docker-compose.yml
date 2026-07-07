@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: milocal
       POSTGRES_PASSWORD: milocal
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d
@@ -29,7 +29,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       PORT: "8080"
     ports:
-      - "8080:8080"
+      - "8082:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
     container_name: milocal-web
     ports:
-      - "3000:80"
+      - "3001:80"
     depends_on:
       - backend
 

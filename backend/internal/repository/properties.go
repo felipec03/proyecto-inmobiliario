@@ -65,6 +65,14 @@ func CreateProperty(p *model.Property) error {
 	return err
 }
 
+func UpdatePropertyImage(propertyID, imageURL string) error {
+	_, err := DB.Exec(`UPDATE properties SET image=$1, updated_at=NOW() WHERE id=$2`, imageURL, propertyID)
+	if err != nil {
+		return fmt.Errorf("error updating property image: %w", err)
+	}
+	return nil
+}
+
 func scanProperty(s scanner) (*model.Property, error) {
 	p := &model.Property{}
 	var hasGas, waterConn, greaseTrap, negotiable bool

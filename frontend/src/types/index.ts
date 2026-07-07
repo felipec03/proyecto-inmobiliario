@@ -27,6 +27,39 @@ export interface UserProfile {
   documents: Document[];
 }
 
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  type: UserType;
+  token: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+  type: UserType;
+}
+
+export interface AuthResponse {
+  user: AuthUser;
+  token: string;
+}
+
+export type ToastType = 'success' | 'error' | 'info';
+
+export interface Toast {
+  id: string;
+  type: ToastType;
+  message: string;
+}
+
 export interface CommercialSpecs {
   hasGas: boolean;
   powerCapacity: 'Básica' | 'Trifásica';
@@ -63,9 +96,29 @@ export interface ChatMessage {
   sources?: Array<{ web: { uri: string; title: string } }>;
 }
 
+export interface FeatureContrib {
+  dimension: string;
+  label: string;
+  score: number;
+  weight: number;
+  maxWeight: number;
+  ideal: number;
+  actual: number;
+}
+
 export interface MatchResponse {
   score: number;
-  details: string[];
+  permitted: boolean;
+  specScore: number;
+  userScore: number;
+  breakdown: FeatureContrib[];
+}
+
+export interface UserPreferences {
+  maxBudget?: number;
+  minSize?: number;
+  maxSize?: number;
+  preferredLocation?: string;
 }
 
 export interface MarketTrend {

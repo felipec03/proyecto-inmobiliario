@@ -1,17 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, ChevronRight, Handshake } from 'lucide-react';
 import type { Property, BusinessRubro } from '@/types';
 
 interface Props {
   property: Property;
-  matchScore: number;
+  matchScore?: number;
   userRubro: BusinessRubro;
   onClick: () => void;
 }
 
 export const CommercialCard: React.FC<Props> = ({ property, matchScore, userRubro, onClick }) => {
   const [imgSrc, setImgSrc] = useState(property.image);
+  const showScore = typeof matchScore === 'number' && matchScore > 0;
 
   return (
     <motion.div
@@ -26,18 +27,20 @@ export const CommercialCard: React.FC<Props> = ({ property, matchScore, userRubr
           onError={() => setImgSrc(`https://placehold.co/800x600/FBB03B/1e293b?text=${encodeURIComponent(property.title.substring(0, 15))}`)}
           referrerPolicy="no-referrer"
         />
-        <div className="absolute top-6 left-6 bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700/50">
-          <div
-            className={`w-2.5 h-2.5 rounded-full ${
-              matchScore > 80
-                ? 'bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.5)]'
-                : 'bg-[#FBB03B] shadow-[0_0_15px_rgba(251,176,59,0.5)]'
-            } animate-pulse`}
-          />
-          <span className="text-[11px] font-black text-white uppercase tracking-widest">
-            {matchScore}% Match {userRubro}
-          </span>
-        </div>
+        {showScore && (
+          <div className="absolute top-6 left-6 bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700/50">
+            <div
+              className={`w-2.5 h-2.5 rounded-full ${
+                matchScore! > 80
+                  ? 'bg-green-400 shadow-[0_0_15px_rgba(74,222,128,0.5)]'
+                  : 'bg-[#FBB03B] shadow-[0_0_15px_rgba(251,176,59,0.5)]'
+              } animate-pulse`}
+            />
+            <span className="text-[11px] font-black text-white uppercase tracking-widest">
+              {matchScore}% Match {userRubro}
+            </span>
+          </div>
+        )}
         {property.negotiable && (
           <div className="absolute bottom-6 right-6 bg-white/90 backdrop-blur-xl p-3 rounded-2xl shadow-2xl border border-white/20">
             <Handshake className="text-slate-900" size={18} />

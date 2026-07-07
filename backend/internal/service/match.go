@@ -2,82 +2,52 @@ package service
 
 import (
 	"milocal/backend/internal/model"
+	"milocal/backend/internal/service/matcher"
 )
 
 func CalculateMatch(property *model.Property, rubro string) int {
-	score := 0
-
-	for _, use := range property.Specs.PermittedUses {
-		if use == rubro {
-			score += 50
-			break
-		}
-	}
-
-	switch rubro {
-	case "Gastronomía":
-		if property.Specs.GreaseTrap {
-			score += 20
-		}
-		if property.Specs.HasGas {
-			score += 20
-		}
-		if property.Specs.FootTraffic == model.TrafficAlto {
-			score += 10
-		}
-	case "Retail":
-		if property.Specs.FrontageSize > 5 {
-			score += 30
-		}
-		if property.Specs.FootTraffic == model.TrafficAlto {
-			score += 20
-		}
-	default:
-		score += 30
-	}
-
-	if score > 99 {
-		score = 99
-	}
-
-	return score
+	result := matcher.Calculate(property, rubro, nil)
+	return int(result.Score * 100)
 }
 
 func GetMatchDetails(property *model.Property, rubro string) []string {
+	result := matcher.Calculate(property, rubro, nil)
+
 	details := []string{}
 
-	permitted := false
-	for _, use := range property.Specs.PermittedUses {
-		if use == rubro {
-			permitted = true
-			break
+	for _, b := range result.Breakdown {
+		if b.Score > 0 && b.Weight > 0 {
+			percentage := int(b.Score / b.Weight * 100)
+			if percentage > 0 {
+				details = append(details, b.Label+": "+mapPercentage(percentage))
+			}
 		}
 	}
 
-	if permitted {
-		details = append(details, "Uso permitido para "+rubro)
+	if !result.Permitted {
+		details = append([]string{"Permisos limitados para " + rubro}, details...)
 	} else {
-		details = append(details, "Permisos limitados para "+rubro)
+		details = append([]string{"Uso permitido para " + rubro}, details...)
 	}
 
-	if property.Specs.GreaseTrap {
-		details = append(details, "Cuenta con trampa de grasa")
-	}
-	if property.Specs.HasGas {
-		details = append(details, "Conexión de gas disponible")
-	}
-	if property.Specs.WaterConnection {
-		details = append(details, "Conexión de agua disponible")
-	}
-	if property.Specs.PowerCapacity == model.PowerTrifasica {
-		details = append(details, "Capacidad eléctrica trifásica")
-	}
-	if property.Specs.FrontageSize > 5 {
-		details = append(details, "Buen frente comercial (>5m)")
-	}
 	if property.Negotiable {
 		details = append(details, "Precio negociable")
 	}
 
 	return details
+}
+
+func mapPercentage(pct int) string {
+	switch {
+	case pct >= 90:
+		return "Excelente"
+	case pct >= 70:
+		return "Muy bueno"
+	case pct >= 50:
+		return "Aceptable"
+	case pct >= 25:
+		return "Básico"
+	default:
+		return "Limitado"
+	}
 }

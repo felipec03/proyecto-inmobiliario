@@ -14,7 +14,7 @@ var DB *sql.DB
 func InitDB() error {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgres://milocal:milocal@localhost:5432/milocal?sslmode=disable"
+		dbURL = "postgres://milocal:milocal@localhost:5434/milocal?sslmode=disable"
 	}
 
 	var err error
@@ -43,18 +43,22 @@ func RunMigrations() error {
 			type VARCHAR(20) NOT NULL,
 			level INT DEFAULT 0,
 			sub_type VARCHAR(20) DEFAULT 'natural',
+			password_hash TEXT NOT NULL DEFAULT '',
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP DEFAULT NOW()
 		)`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT ''`,
 		`CREATE TABLE IF NOT EXISTS documents (
 			id VARCHAR(36) PRIMARY KEY,
 			user_id VARCHAR(36) REFERENCES users(id),
 			name VARCHAR(255) NOT NULL,
 			type VARCHAR(20) NOT NULL,
 			status VARCHAR(20) DEFAULT 'empty',
+			file_path TEXT DEFAULT '',
 			created_at TIMESTAMP DEFAULT NOW(),
 			updated_at TIMESTAMP DEFAULT NOW()
 		)`,
+		`ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_path TEXT DEFAULT ''`,
 		`CREATE TABLE IF NOT EXISTS properties (
 			id VARCHAR(36) PRIMARY KEY,
 			title VARCHAR(255) NOT NULL,
@@ -130,7 +134,7 @@ func seedData() error {
 		`INSERT INTO properties (id, title, price, currency, sqm, location, lat, lng, image, description, has_gas, power_capacity, water_connection, grease_trap, frontage_size, foot_traffic, permitted_uses, nearby_pois, past_business, renovation_needed, owner_notes, negotiable, neighborhood_insights) VALUES
 		('3', 'Local Esquina Gran Visibilidad', 9500000, 'COP', 85, 'Vía Primavera, Medellín', 6.2084, -75.5663, 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800', 'Local de alto impacto visual. Ideal para marca de retail o salón de belleza de lujo.', true, 'Trifásica', true, false, 12, 'Alto', ARRAY['Retail','Servicios','Otro'], ARRAY['Parque Lleras','Hotel Click Clack','Zona Rosa'], 'Restaurante-Bar de autor.', 'Remodelación de fachada requerida por reglamento de la zona.', 'Interesado en contratos a largo plazo (3+ años).', true, 'Zona comercial más exclusiva de la ciudad. Alto poder adquisitivo.')`,
 
-		`INSERT INTO users (id, name, email, type, level, sub_type) VALUES ('u1', 'Carlos Emprendedor', 'carlos@startup.cl', 'entrepreneur', 0, 'juridica') ON CONFLICT DO NOTHING`,
+		`INSERT INTO users (id, name, email, type, level, sub_type, password_hash) VALUES ('u1', 'Carlos Emprendedor', 'carlos@startup.cl', 'entrepreneur', 0, 'juridica', '') ON CONFLICT DO NOTHING`,
 
 		`INSERT INTO documents (id, user_id, name, type, status) VALUES
 		('d1', 'u1', 'Identidad Representante', 'identity', 'pending'),

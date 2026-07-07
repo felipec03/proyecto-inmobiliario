@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     type VARCHAR(20) NOT NULL CHECK (type IN ('entrepreneur', 'owner')),
     level INT DEFAULT 0 CHECK (level IN (0, 1)),
     sub_type VARCHAR(20) DEFAULT 'natural' CHECK (sub_type IN ('natural', 'juridica')),
+    password_hash TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS documents (
     name VARCHAR(255) NOT NULL,
     type VARCHAR(20) NOT NULL CHECK (type IN ('identity', 'income', 'legal', 'property')),
     status VARCHAR(20) DEFAULT 'empty' CHECK (status IN ('empty', 'pending', 'verified')),
+    file_path TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

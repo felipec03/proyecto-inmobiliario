@@ -3,13 +3,14 @@ package repository
 import (
 	"database/sql"
 	"fmt"
+
 	"milocal/backend/internal/model"
 )
 
 func GetUserByID(id string) (*model.UserProfile, error) {
 	u := &model.UserProfile{}
-	err := DB.QueryRow(`SELECT id, name, email, type, level, sub_type FROM users WHERE id = $1`, id).Scan(
-		&u.ID, &u.Name, &u.Email, &u.Type, &u.Level, &u.SubType,
+	err := DB.QueryRow(`SELECT id, name, email, type, level, sub_type, password_hash FROM users WHERE id = $1`, id).Scan(
+		&u.ID, &u.Name, &u.Email, &u.Type, &u.Level, &u.SubType, &u.PasswordHash,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -20,8 +21,33 @@ func GetUserByID(id string) (*model.UserProfile, error) {
 	return u, nil
 }
 
+func GetUserByEmail(email string) (*model.UserProfile, error) {
+	u := &model.UserProfile{}
+	err := DB.QueryRow(`SELECT id, name, email, type, level, sub_type, password_hash FROM users WHERE email = $1`, email).Scan(
+		&u.ID, &u.Name, &u.Email, &u.Type, &u.Level, &u.SubType, &u.PasswordHash,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error fetching user by email: %w", err)
+	}
+	return u, nil
+}
+
+func CreateUser(u *model.UserProfile) error {
+	_, err := DB.Exec(`INSERT INTO users (id, name, email, type, level, sub_type, password_hash)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		u.ID, u.Name, u.Email, string(u.Type), u.Level, u.SubType, u.PasswordHash,
+	)
+	if err != nil {
+		return fmt.Errorf("error creating user: %w", err)
+	}
+	return nil
+}
+
 func GetUserDocuments(userID string) ([]model.Document, error) {
-	rows, err := DB.Query(`SELECT id, user_id, name, type, status FROM documents WHERE user_id = $1`, userID)
+	rows, err := DB.Query(`SELECT id, user_id, name, type, status, COALESCE(file_path, '') FROM documents WHERE user_id = $1`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching documents: %w", err)
 	}
@@ -30,7 +56,7 @@ func GetUserDocuments(userID string) ([]model.Document, error) {
 	var docs []model.Document
 	for rows.Next() {
 		var d model.Document
-		if err := rows.Scan(&d.ID, &d.UserID, &d.Name, &d.Type, &d.Status); err != nil {
+		if err := rows.Scan(&d.ID, &d.UserID, &d.Name, &d.Type, &d.Status, &d.FilePath); err != nil {
 			return nil, fmt.Errorf("error scanning document: %w", err)
 		}
 		docs = append(docs, d)
@@ -70,8 +96,8 @@ func VerifyDocument(userID, docID string) (*model.Document, error) {
 	}
 
 	var d model.Document
-	err = DB.QueryRow(`SELECT id, user_id, name, type, status FROM documents WHERE id=$1`, docID).Scan(
-		&d.ID, &d.UserID, &d.Name, &d.Type, &d.Status,
+	err = DB.QueryRow(`SELECT id, user_id, name, type, status, COALESCE(file_path, '') FROM documents WHERE id=$1`, docID).Scan(
+		&d.ID, &d.UserID, &d.Name, &d.Type, &d.Status, &d.FilePath,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching document: %w", err)
@@ -93,4 +119,13 @@ func updateUserLevel(userID string) {
 	}
 
 	DB.Exec(`UPDATE users SET level=$1, updated_at=NOW() WHERE id=$2`, level, userID)
+}
+
+func UpdateDocumentFilePath(docID, userID, filePath string) error {
+	_, err := DB.Exec(`UPDATE documents SET file_path=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`,
+		filePath, docID, userID)
+	if err != nil {
+		return fmt.Errorf("error updating document file path: %w", err)
+	}
+	return nil
 }

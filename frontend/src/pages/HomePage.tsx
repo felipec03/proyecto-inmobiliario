@@ -1,96 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import {
   Zap, ArrowRight, Target, Key, ChevronRight,
   Grid, MapIcon, MapPin, Flame, Droplets, Store,
-  TrendingUp, Briefcase, Users, MessageCircle, TrainFront, School, ShoppingBag
+  TrendingUp, Briefcase, Users, RefreshCw, PackageOpen,
 } from 'lucide-react';
 import { CommercialCard } from '@/components/CommercialCard';
+import { PropertyCardSkeleton } from '@/components/Skeleton';
+import { useToast } from '@/components/Toast';
+import { api } from '@/services/api';
 import type { Property, BusinessRubro, RubroOption } from '@/types';
-
-const COMMERCIAL_PROPERTIES: Property[] = [
-  {
-    id: '1',
-    title: 'Local Premium con Salida a Calle',
-    price: 1200000,
-    currency: 'CLP',
-    sqm: 45,
-    location: 'Lastarria, Santiago',
-    lat: -33.4385,
-    lng: -70.6397,
-    image: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=800',
-    description: 'Local ideal para heladería o cafetería pequeña. Cuenta con conexión de agua reforzada y trifásica.',
-    specs: {
-      hasGas: false,
-      powerCapacity: 'Trifásica',
-      waterConnection: true,
-      greaseTrap: true,
-      frontageSize: 4,
-      footTraffic: 'Alto',
-      permittedUses: ['Gastronomía', 'Retail'],
-    },
-    nearbyPOIs: ['Metro Univ. Católica (200m)', 'Centro GAM', 'Barrio Universitario'],
-    pastBusiness: 'Fue una boutique de ropa de diseño independiente por 4 años.',
-    renovationNeeded: 'Pintura general y mantenimiento menor de sistema eléctrico.',
-    ownerNotes: 'Dispuesto a dar 1 mes de gracia por remodelación.',
-    negotiable: true,
-    neighborhoodInsights: 'Zona de alto flujo turístico y estudiantil. Demanda constante los fines de semana.',
-  },
-  {
-    id: '2',
-    title: 'Bodega Urbana / Dark Store',
-    price: 35000,
-    currency: 'MXN',
-    sqm: 120,
-    location: 'Colonia Roma, CDMX',
-    lat: 19.4149,
-    lng: -99.1623,
-    image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800',
-    description: 'Espacio optimizado para logística de última milla o taller de servicios técnicos.',
-    specs: {
-      hasGas: false,
-      powerCapacity: 'Básica',
-      waterConnection: true,
-      greaseTrap: false,
-      frontageSize: 2,
-      footTraffic: 'Bajo',
-      permittedUses: ['Bodega / logística', 'Servicios'],
-    },
-    nearbyPOIs: ['Av. Insurgentes (300m)', 'Metro Insurgentes', 'Área Residencial'],
-    pastBusiness: 'Distribuidora de insumos médicos.',
-    renovationNeeded: 'Nivelación de piso en zona de carga.',
-    ownerNotes: 'Precio firme, pero incluye gastos comunes por el primer año.',
-    negotiable: false,
-    neighborhoodInsights: 'Ubicación estratégica para delivery. Zona segura con control de acceso.',
-  },
-  {
-    id: '3',
-    title: 'Local Esquina Gran Visibilidad',
-    price: 9500000,
-    currency: 'COP',
-    sqm: 85,
-    location: 'Vía Primavera, Medellín',
-    lat: 6.2084,
-    lng: -75.5663,
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800',
-    description: 'Local de alto impacto visual. Ideal para marca de retail o salón de belleza de lujo.',
-    specs: {
-      hasGas: true,
-      powerCapacity: 'Trifásica',
-      waterConnection: true,
-      greaseTrap: false,
-      frontageSize: 12,
-      footTraffic: 'Alto',
-      permittedUses: ['Retail', 'Servicios', 'Otro'],
-    },
-    nearbyPOIs: ['Parque Lleras', 'Hotel Click Clack', 'Zona Rosa'],
-    pastBusiness: 'Restaurante-Bar de autor.',
-    renovationNeeded: 'Remodelación de fachada requerida por reglamento de la zona.',
-    ownerNotes: 'Interesado en contratos a largo plazo (3+ años).',
-    negotiable: true,
-    neighborhoodInsights: 'Zona comercial más exclusiva de la ciudad. Alto poder adquisitivo.',
-  },
-];
 
 const RUBROS: RubroOption[] = [
   { label: 'Gastronomía', icon: <Flame />, color: '#FBB03B', description: 'Restaurantes, Cafés, Dark Kitchens' },
@@ -101,20 +20,6 @@ const RUBROS: RubroOption[] = [
   { label: 'Otro', icon: <Grid />, color: '#FBB03B', description: 'Cualquier otro rubro comercial' },
 ];
 
-function calculateMatch(property: Property, rubro: BusinessRubro): number {
-  let score = 0;
-  if (property.specs.permittedUses.includes(rubro)) score += 50;
-  if (rubro === 'Gastronomía') {
-    if (property.specs.greaseTrap) score += 20;
-    if (property.specs.hasGas) score += 20;
-    if (property.specs.footTraffic === 'Alto') score += 10;
-  } else if (rubro === 'Retail') {
-    if (property.specs.frontageSize > 5) score += 30;
-    if (property.specs.footTraffic === 'Alto') score += 20;
-  } else score += 30;
-  return Math.min(score, 99);
-}
-
 interface Props {
   onNavigate: (tab: string, params?: Record<string, string>) => void;
   onSelectProperty: (id: string) => void;
@@ -123,6 +28,33 @@ interface Props {
 export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [selectedRubro, setSelectedRubro] = useState<BusinessRubro>('Gastronomía');
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { addToast } = useToast();
+
+  const fetchProperties = useCallback(async (rubro?: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await api.getProperties(rubro || undefined);
+      setProperties(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error al cargar propiedades';
+      setError(msg);
+      addToast('error', msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => {
+    fetchProperties(selectedRubro);
+  }, [selectedRubro, fetchProperties]);
+
+  const handleRetry = () => {
+    fetchProperties(selectedRubro);
+  };
 
   return (
     <div className="space-y-12 max-w-7xl mx-auto">
@@ -148,6 +80,7 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
               <button
                 onClick={() => onNavigate('onboarding')}
                 className="px-10 py-6 bg-[#FBB03B] text-slate-900 rounded-[2rem] font-black text-lg flex items-center gap-3 hover:scale-105 hover:rotate-1 transition-all shadow-[0_20px_50px_rgba(251,176,59,0.3)]"
+                aria-label="Empezar el assessment"
               >
                 Empezar Assessment <ArrowRight size={24} />
               </button>
@@ -157,7 +90,7 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
                     key={i}
                     src={`https://i.pravatar.cc/100?img=${i + 10}`}
                     className="w-12 h-12 rounded-full border-4 border-slate-900 shadow-xl"
-                    alt="User"
+                    alt="Usuario de MiLocal"
                   />
                 ))}
                 <div className="pl-8">
@@ -209,12 +142,14 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
             <button
               onClick={() => setViewMode('grid')}
               className={`px-8 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all ${viewMode === 'grid' ? 'bg-slate-900 text-white' : 'text-gray-400 hover:text-slate-900'}`}
+              aria-label="Vista en grilla"
             >
               <Grid size={16} /> Grilla
             </button>
             <button
               onClick={() => setViewMode('map')}
               className={`px-8 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all ${viewMode === 'map' ? 'bg-slate-900 text-white' : 'text-gray-400 hover:text-slate-900'}`}
+              aria-label="Vista en mapa"
             >
               <MapIcon size={16} /> Mapa
             </button>
@@ -232,6 +167,7 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
                   ? 'bg-[#FBB03B] border-slate-900 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] translate-y-[-4px]'
                   : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200'
               }`}
+              aria-label={`Filtrar por ${rubro.label}`}
             >
               <div className={`${selectedRubro === rubro.label ? 'text-slate-900 scale-125' : 'text-gray-300'} transition-transform`}>
                 {rubro.icon}
@@ -248,15 +184,67 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
 
         {/* Properties Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-          {COMMERCIAL_PROPERTIES.map((property) => (
-            <CommercialCard
-              key={property.id}
-              property={property}
-              matchScore={calculateMatch(property, selectedRubro)}
-              userRubro={selectedRubro}
-              onClick={() => onSelectProperty(property.id)}
-            />
-          ))}
+          {/* Loading skeletons */}
+          {isLoading &&
+            Array.from({ length: 6 }).map((_, i) => (
+              <motion.div
+                key={`skeleton-${i}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+              >
+                <PropertyCardSkeleton />
+              </motion.div>
+            ))}
+
+          {/* Error state */}
+          {!isLoading && error && (
+            <div className="col-span-full py-20 text-center">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <RefreshCw size={32} className="text-red-400" />
+              </div>
+              <h4 className="text-xl font-black text-slate-900 mb-2">Error al cargar propiedades</h4>
+              <p className="text-slate-500 font-medium mb-6">{error}</p>
+              <button
+                onClick={handleRetry}
+                className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#FBB03B] hover:text-slate-900 transition-all inline-flex items-center gap-2 shadow-lg"
+                aria-label="Reintentar carga de propiedades"
+              >
+                <RefreshCw size={16} /> Reintentar
+              </button>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!isLoading && !error && properties.length === 0 && (
+            <div className="col-span-full py-20 text-center">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <PackageOpen size={32} className="text-slate-400" />
+              </div>
+              <h4 className="text-xl font-black text-slate-900 mb-2">No se encontraron propiedades</h4>
+              <p className="text-slate-500 font-medium">
+                No hay locales disponibles para <span className="font-black text-slate-700">{selectedRubro}</span> en este momento.
+              </p>
+            </div>
+          )}
+
+          {/* Property cards */}
+          {!isLoading &&
+            !error &&
+            properties.map((property, idx) => (
+              <motion.div
+                key={property.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+              >
+                <CommercialCard
+                  property={property}
+                  userRubro={selectedRubro}
+                  onClick={() => onSelectProperty(property.id)}
+                />
+              </motion.div>
+            ))}
         </div>
       </div>
     </div>

@@ -1,69 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft, Users, Info, History, Hammer, MapPin,
   MessageCircle, TrainFront, School, ShoppingBag,
   Target, Handshake, Clock, Lock, ArrowRight,
-  Flame, Zap, Droplets, Grid
+  Flame, Zap, Droplets, Grid, CheckCircle, AlertTriangle, MinusCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { ViabilityItem } from '@/components/ViabilityItem';
 import { TechBadge } from '@/components/TechBadge';
-import type { Property, BusinessRubro, UserProfile } from '@/types';
-
-const COMMERCIAL_PROPERTIES: Property[] = [
-  {
-    id: '1', title: 'Local Premium con Salida a Calle', price: 1200000, currency: 'CLP', sqm: 45,
-    location: 'Lastarria, Santiago', lat: -33.4385, lng: -70.6397,
-    image: 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&q=80&w=800',
-    description: 'Local ideal para heladería o cafetería pequeña. Cuenta con conexión de agua reforzada y trifásica.',
-    specs: { hasGas: false, powerCapacity: 'Trifásica', waterConnection: true, greaseTrap: true, frontageSize: 4, footTraffic: 'Alto', permittedUses: ['Gastronomía', 'Retail'] },
-    nearbyPOIs: ['Metro Univ. Católica (200m)', 'Centro GAM', 'Barrio Universitario'],
-    pastBusiness: 'Fue una boutique de ropa de diseño independiente por 4 años.',
-    renovationNeeded: 'Pintura general y mantenimiento menor de sistema eléctrico.',
-    ownerNotes: 'Dispuesto a dar 1 mes de gracia por remodelación.',
-    negotiable: true,
-    neighborhoodInsights: 'Zona de alto flujo turístico y estudiantil. Demanda constante los fines de semana.',
-  },
-  {
-    id: '2', title: 'Bodega Urbana / Dark Store', price: 35000, currency: 'MXN', sqm: 120,
-    location: 'Colonia Roma, CDMX', lat: 19.4149, lng: -99.1623,
-    image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=800',
-    description: 'Espacio optimizado para logística de última milla o taller de servicios técnicos.',
-    specs: { hasGas: false, powerCapacity: 'Básica', waterConnection: true, greaseTrap: false, frontageSize: 2, footTraffic: 'Bajo', permittedUses: ['Bodega / logística', 'Servicios'] },
-    nearbyPOIs: ['Av. Insurgentes (300m)', 'Metro Insurgentes', 'Área Residencial'],
-    pastBusiness: 'Distribuidora de insumos médicos.',
-    renovationNeeded: 'Nivelación de piso en zona de carga.',
-    ownerNotes: 'Precio firme, pero incluye gastos comunes por el primer año.',
-    negotiable: false,
-    neighborhoodInsights: 'Ubicación estratégica para delivery. Zona segura con control de acceso.',
-  },
-  {
-    id: '3', title: 'Local Esquina Gran Visibilidad', price: 9500000, currency: 'COP', sqm: 85,
-    location: 'Vía Primavera, Medellín', lat: 6.2084, lng: -75.5663,
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800',
-    description: 'Local de alto impacto visual. Ideal para marca de retail o salón de belleza de lujo.',
-    specs: { hasGas: true, powerCapacity: 'Trifásica', waterConnection: true, greaseTrap: false, frontageSize: 12, footTraffic: 'Alto', permittedUses: ['Retail', 'Servicios', 'Otro'] },
-    nearbyPOIs: ['Parque Lleras', 'Hotel Click Clack', 'Zona Rosa'],
-    pastBusiness: 'Restaurante-Bar de autor.',
-    renovationNeeded: 'Remodelación de fachada requerida por reglamento de la zona.',
-    ownerNotes: 'Interesado en contratos a largo plazo (3+ años).',
-    negotiable: true,
-    neighborhoodInsights: 'Zona comercial más exclusiva de la ciudad. Alto poder adquisitivo.',
-  },
-];
-
-function calculateMatch(property: Property, rubro: BusinessRubro): number {
-  let score = 0;
-  if (property.specs.permittedUses.includes(rubro)) score += 50;
-  if (rubro === 'Gastronomía') {
-    if (property.specs.greaseTrap) score += 20;
-    if (property.specs.hasGas) score += 20;
-    if (property.specs.footTraffic === 'Alto') score += 10;
-  } else if (rubro === 'Retail') {
-    if (property.specs.frontageSize > 5) score += 30;
-    if (property.specs.footTraffic === 'Alto') score += 20;
-  } else score += 30;
-  return Math.min(score, 99);
-}
+import { PropertyDetailSkeleton } from '@/components/Skeleton';
+import { useToast } from '@/components/Toast';
+import { api } from '@/services/api';
+import type { Property, BusinessRubro, UserProfile, MatchResponse } from '@/types';
 
 interface Props {
   propertyId: string;
@@ -73,30 +20,118 @@ interface Props {
   onNavigate: (tab: string) => void;
 }
 
-export const PropertyDetailPage: React.FC<Props> = ({ propertyId, selectedRubro, userProfile, onBack, onNavigate }) => {
+export const PropertyDetailPage: React.FC<Props> = ({
+  propertyId,
+  selectedRubro,
+  userProfile,
+  onBack,
+  onNavigate,
+}) => {
+  const [property, setProperty] = useState<Property | null>(null);
+  const [matchData, setMatchData] = useState<MatchResponse | null>(null);
   const [imgSrc, setImgSrc] = useState('');
+  const [isLoadingProperty, setIsLoadingProperty] = useState(true);
+  const [isLoadingMatch, setIsLoadingMatch] = useState(true);
+  const [propertyError, setPropertyError] = useState<string | null>(null);
+  const [matchError, setMatchError] = useState<string | null>(null);
+  const { addToast } = useToast();
 
-  const property = useMemo(
-    () => COMMERCIAL_PROPERTIES.find((p) => p.id === propertyId),
-    [propertyId]
-  );
+  // Fetch property
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingProperty(true);
+    setPropertyError(null);
 
-  if (!property) {
+    api
+      .getProperty(propertyId)
+      .then((data) => {
+        if (!cancelled) {
+          setProperty(data);
+          setImgSrc(data.image);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Error al cargar la propiedad';
+          setPropertyError(msg);
+          addToast('error', msg);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingProperty(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [propertyId, addToast]);
+
+  // Fetch match
+  useEffect(() => {
+    if (!propertyId || !selectedRubro) return;
+
+    let cancelled = false;
+    setIsLoadingMatch(true);
+    setMatchError(null);
+
+    api
+      .calculateMatch(propertyId, selectedRubro)
+      .then((data) => {
+        if (!cancelled) setMatchData(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Error al calcular el match';
+          setMatchError(msg);
+          addToast('error', msg);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingMatch(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [propertyId, selectedRubro, addToast]);
+
+  // Loading state
+  if (isLoadingProperty) {
+    return <PropertyDetailSkeleton />;
+  }
+
+  // Error state
+  if (propertyError || !property) {
     return (
-      <div className="text-center py-20">
-        <p className="text-slate-400">Propiedad no encontrada</p>
-        <button onClick={onBack} className="mt-4 text-[#FBB03B] font-bold">Volver</button>
+      <div className="max-w-2xl mx-auto py-20 text-center">
+        <button
+          onClick={onBack}
+          className="mb-8 flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-colors group mx-auto"
+          aria-label="Volver al listado"
+        >
+          <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Volver al listado
+        </button>
+        <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertTriangle size={32} className="text-red-400" />
+        </div>
+        <h3 className="text-xl font-black text-slate-900 mb-2">Propiedad no encontrada</h3>
+        <p className="text-slate-500 font-medium mb-6">{propertyError || 'Esta propiedad no existe o fue removida.'}</p>
+        <button
+          onClick={onBack}
+          className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#FBB03B] hover:text-slate-900 transition-all inline-flex items-center gap-2 shadow-lg"
+          aria-label="Volver al listado de propiedades"
+        >
+          <ArrowLeft size={16} /> Volver al listado
+        </button>
       </div>
     );
   }
 
-  const matchScore = calculateMatch(property, selectedRubro);
+  const matchScore = matchData ? Math.round(matchData.score * 100) : 0;
+  const breakdown = matchData?.breakdown || [];
 
   return (
     <div className="max-w-6xl mx-auto pb-20">
       <button
         onClick={onBack}
         className="mb-8 flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black text-[10px] uppercase tracking-widest transition-colors group"
+        aria-label="Volver al listado de propiedades"
       >
         <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Volver al listado
       </button>
@@ -111,9 +146,15 @@ export const PropertyDetailPage: React.FC<Props> = ({ propertyId, selectedRubro,
               onError={() => setImgSrc(`https://placehold.co/800x600/FBB03B/1e293b?text=${encodeURIComponent(property.title.substring(0, 15))}`)}
             />
             <div className="absolute top-8 left-8 flex gap-3">
-              <div className="bg-slate-900 text-[#FBB03B] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
-                {matchScore}% Match {selectedRubro}
-              </div>
+              {isLoadingMatch ? (
+                <div className="bg-slate-900 text-[#FBB03B] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
+                  <RefreshCw size={14} className="animate-spin" /> Calculando...
+                </div>
+              ) : (
+                <div className="bg-slate-900 text-[#FBB03B] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
+                  {matchScore}% Match {selectedRubro}
+                </div>
+              )}
               <div className="bg-white text-slate-900 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
                 <Users size={14} className="text-[#FBB03B]" /> {property.specs.footTraffic} Tráfico
               </div>
@@ -189,22 +230,110 @@ export const PropertyDetailPage: React.FC<Props> = ({ propertyId, selectedRubro,
         <div className="lg:col-span-2 space-y-8">
           <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm sticky top-12">
             <div className="mb-10">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 border-b border-slate-50 pb-2">Score de Viabilidad MiLocal</h4>
-              <div className="space-y-4">
-                <ViabilityItem
-                  label={`Match para ${selectedRubro}`}
-                  value={property.specs.permittedUses.includes(selectedRubro) ? 'COMPATIBLE' : 'LIMITADO'}
-                  status={property.specs.permittedUses.includes(selectedRubro) ? 'success' : 'error'}
-                  icon={<Target size={14} />}
-                />
-                <ViabilityItem
-                  label="Negociación"
-                  value={property.negotiable ? 'OPORTUNIDAD' : 'PRECIO BASE'}
-                  status={property.negotiable ? 'success' : 'neutral'}
-                  icon={<Handshake size={14} />}
-                />
-                <ViabilityItem label="Disponibilidad" value="INMEDIATA" status="success" icon={<Clock size={14} />} />
-              </div>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 border-b border-slate-50 pb-2">
+                Score de Viabilidad MiLocal
+              </h4>
+
+              {/* Match loading */}
+              {isLoadingMatch && (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-center justify-between p-5 bg-slate-50/80 rounded-2xl border border-slate-100 animate-pulse">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-slate-200 w-10 h-10" />
+                        <div className="h-4 bg-slate-200 rounded w-24" />
+                      </div>
+                      <div className="h-6 bg-slate-200 rounded w-14" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Match error */}
+              {!isLoadingMatch && matchError && (
+                <div className="text-center py-6">
+                  <AlertTriangle size={24} className="text-yellow-500 mx-auto mb-3" />
+                  <p className="text-xs font-bold text-slate-500">No se pudo calcular el match. Mostrando análisis básico.</p>
+                </div>
+              )}
+
+              {/* Real breakdown from API */}
+              {!isLoadingMatch && !matchError && breakdown.length > 0 && (
+                <div className="space-y-4">
+                  {breakdown.map((item) => {
+                    const ratio = item.maxWeight > 0 ? item.score / item.maxWeight : 0;
+                    const percentage = Math.round(ratio * 100);
+                    const statusColor =
+                      ratio > 0.7 ? 'text-green-500' :
+                      ratio > 0.3 ? 'text-yellow-500' : 'text-red-500';
+                    const bgBadge =
+                      ratio > 0.7 ? 'bg-green-100 text-green-700' :
+                      ratio > 0.3 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+                    const Icon =
+                      ratio > 0.7 ? CheckCircle :
+                      ratio > 0.3 ? MinusCircle : AlertTriangle;
+
+                    return (
+                      <div key={item.dimension} className="flex items-center justify-between p-5 bg-slate-50/80 rounded-2xl border border-slate-100 group hover:bg-white hover:shadow-lg transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-xl bg-white shadow-sm ${statusColor}`}>
+                            <Icon size={14} />
+                          </div>
+                          <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">{item.label}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${bgBadge}`}>
+                            {percentage}%
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Fallback when no match data */}
+              {!isLoadingMatch && !matchError && breakdown.length === 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-white shadow-sm text-green-500">
+                        <Target size={14} />
+                      </div>
+                      <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Match para {selectedRubro}</span>
+                    </div>
+                    <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                      property.specs.permittedUses.includes(selectedRubro) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {property.specs.permittedUses.includes(selectedRubro) ? 'COMPATIBLE' : 'LIMITADO'}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-white shadow-sm text-green-500">
+                        <Handshake size={14} />
+                      </div>
+                      <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Negociación</span>
+                    </div>
+                    <div className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${
+                      property.negotiable ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {property.negotiable ? 'OPORTUNIDAD' : 'PRECIO BASE'}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-xl bg-white shadow-sm text-green-500">
+                        <Clock size={14} />
+                      </div>
+                      <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Disponibilidad</span>
+                    </div>
+                    <div className="px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-green-100 text-green-700">
+                      INMEDIATA
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-6 mb-10">
@@ -238,16 +367,17 @@ export const PropertyDetailPage: React.FC<Props> = ({ propertyId, selectedRubro,
                   <button
                     onClick={() => onNavigate('profile')}
                     className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-[11px] uppercase tracking-[0.15em] hover:bg-[#FBB03B] hover:text-slate-900 transition-all shadow-2xl shadow-slate-200"
+                    aria-label="Ir al perfil para subir documentos"
                   >
                     Actualizar a LEVEL 1
                   </button>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <button className="w-full py-6 bg-slate-900 text-[#FBB03B] rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3">
+                  <button className="w-full py-6 bg-slate-900 text-[#FBB03B] rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3" aria-label="Solicitar visita a la propiedad">
                     Solicitar Visita <ArrowRight size={20} />
                   </button>
-                  <button className="w-full py-6 bg-white text-slate-900 border-2 border-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-3">
+                  <button className="w-full py-6 bg-white text-slate-900 border-2 border-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-3" aria-label="Enviar propuesta formal">
                     Enviar Propuesta Formal
                   </button>
                 </div>
