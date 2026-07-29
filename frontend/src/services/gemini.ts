@@ -19,7 +19,7 @@ export const chatWithGemini = async (
   Tu misión es ayudar a emprendedores a encontrar el local perfecto mediante un sistema de match.
   ${rubro ? `El usuario tiene un negocio de: ${rubro}. Enfoca tus consejos en las necesidades técnicas de este sector (permisos, tráfico, instalaciones).` : ''}
   Evalúa factores como: visibilidad, flujo peatonal, compatibilidad de patentes comerciales y ROI.
-  Si preguntan por zonas específicas, usa Google Search para dar datos actualizados de barrios comerciales en Latam.`;
+  Si preguntan por zonas específicas, usa Google Search para dar datos actualizados de barrios comerciales en Chile. Considera los Planes Reguladores Comunales, la Ley de Copropiedad Inmobiliaria, y las normativas municipales chilenas.`;
 
   const response = await ai.models.generateContent({
     model,

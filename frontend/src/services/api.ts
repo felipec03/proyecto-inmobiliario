@@ -78,12 +78,12 @@ export const api = {
       }
     ),
 
-  register: (name: string, email: string, password: string, type: string) =>
+  register: (name: string, email: string, password: string, type: string, rut?: string) =>
     request<{ user: { id: string; name: string; email: string; type: string }; token: string }>(
       '/auth/register',
       {
         method: 'POST',
-        body: JSON.stringify({ name, email, password, type }),
+        body: JSON.stringify({ name, email, password, type, rut }),
         auth: false,
       }
     ),
@@ -121,6 +121,13 @@ export const api = {
       isFormData: true,
     });
   },
+
+  // --- Property Contact ---
+  contactProperty: (propertyId: string, data: { type: 'visit' | 'proposal'; name: string; email: string; message: string }) =>
+    request<{ ok: boolean }>(`/properties/${propertyId}/contact`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // --- Property Images ---
   uploadPropertyImage: (propertyId: string, file: File) => {

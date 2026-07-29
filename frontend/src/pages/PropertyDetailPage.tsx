@@ -4,18 +4,31 @@ import {
   MessageCircle, TrainFront, School, ShoppingBag,
   Target, Handshake, Clock, Lock, ArrowRight,
   Flame, Zap, Droplets, Grid, CheckCircle, AlertTriangle, MinusCircle,
-  RefreshCw,
+  RefreshCw, LogIn,
 } from 'lucide-react';
 import { TechBadge } from '@/components/TechBadge';
 import { PropertyDetailSkeleton } from '@/components/Skeleton';
+import { ContactModal } from '@/components/ContactModal';
 import { useToast } from '@/components/Toast';
 import { api } from '@/services/api';
 import type { Property, BusinessRubro, UserProfile, MatchResponse } from '@/types';
+import { UF_RATE } from '@/constants';
+
+function formatPrice(price: number, currency: string): { primary: string; secondary: string | null } {
+  if (currency === 'CLP') {
+    const ufValue = price / UF_RATE;
+    const primary = `${ufValue.toFixed(1)} UF`;
+    const secondary = `($${price.toLocaleString('es-CL')} CLP)`;
+    return { primary, secondary };
+  }
+  return { primary: `${currency} ${price.toLocaleString()}`, secondary: null };
+}
 
 interface Props {
   propertyId: string;
   selectedRubro: BusinessRubro;
   userProfile: UserProfile;
+  isAuthenticated?: boolean;
   onBack: () => void;
   onNavigate: (tab: string) => void;
 }
@@ -24,6 +37,7 @@ export const PropertyDetailPage: React.FC<Props> = ({
   propertyId,
   selectedRubro,
   userProfile,
+  isAuthenticated = true,
   onBack,
   onNavigate,
 }) => {
@@ -34,6 +48,8 @@ export const PropertyDetailPage: React.FC<Props> = ({
   const [isLoadingMatch, setIsLoadingMatch] = useState(true);
   const [propertyError, setPropertyError] = useState<string | null>(null);
   const [matchError, setMatchError] = useState<string | null>(null);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [contactType, setContactType] = useState<'visit' | 'proposal'>('visit');
   const { addToast } = useToast();
 
   // Fetch property
@@ -64,9 +80,9 @@ export const PropertyDetailPage: React.FC<Props> = ({
     return () => { cancelled = true; };
   }, [propertyId, addToast]);
 
-  // Fetch match
+  // Fetch match – only for authenticated users
   useEffect(() => {
-    if (!propertyId || !selectedRubro) return;
+    if (!propertyId || !selectedRubro || !isAuthenticated) return;
 
     let cancelled = false;
     setIsLoadingMatch(true);
@@ -89,7 +105,12 @@ export const PropertyDetailPage: React.FC<Props> = ({
       });
 
     return () => { cancelled = true; };
-  }, [propertyId, selectedRubro, addToast]);
+  }, [propertyId, selectedRubro, isAuthenticated, addToast]);
+
+  const handleContact = (type: 'visit' | 'proposal') => {
+    setContactType(type);
+    setContactModalOpen(true);
+  };
 
   // Loading state
   if (isLoadingProperty) {
@@ -125,6 +146,7 @@ export const PropertyDetailPage: React.FC<Props> = ({
 
   const matchScore = matchData ? Math.round(matchData.score * 100) : 0;
   const breakdown = matchData?.breakdown || [];
+  const priceDisplay = formatPrice(property.price, property.currency);
 
   return (
     <div className="max-w-6xl mx-auto pb-20">
@@ -146,13 +168,19 @@ export const PropertyDetailPage: React.FC<Props> = ({
               onError={() => setImgSrc(`https://placehold.co/800x600/FBB03B/1e293b?text=${encodeURIComponent(property.title.substring(0, 15))}`)}
             />
             <div className="absolute top-8 left-8 flex gap-3">
-              {isLoadingMatch ? (
-                <div className="bg-slate-900 text-[#FBB03B] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
-                  <RefreshCw size={14} className="animate-spin" /> Calculando...
-                </div>
+              {isAuthenticated ? (
+                isLoadingMatch ? (
+                  <div className="bg-slate-900 text-[#FBB03B] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
+                    <RefreshCw size={14} className="animate-spin" /> Calculando...
+                  </div>
+                ) : matchData ? (
+                  <div className="bg-slate-900 text-[#FBB03B] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
+                    {matchScore}% Match {selectedRubro}
+                  </div>
+                ) : null
               ) : (
                 <div className="bg-slate-900 text-[#FBB03B] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
-                  {matchScore}% Match {selectedRubro}
+                  <Lock size={14} /> Inicia sesión para ver compatibilidad
                 </div>
               )}
               <div className="bg-white text-slate-900 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl flex items-center gap-2">
@@ -167,8 +195,13 @@ export const PropertyDetailPage: React.FC<Props> = ({
               <div className="text-right">
                 <p className="text-[10px] font-black uppercase opacity-60 tracking-widest mb-1">Canon Mensual</p>
                 <p className="text-3xl font-black text-[#FBB03B]">
-                  {property.currency} {property.price.toLocaleString()}
+                  {priceDisplay.primary}
                 </p>
+                {priceDisplay.secondary && (
+                  <p className="text-xs text-white/60 font-medium mt-1">
+                    {priceDisplay.secondary}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -234,8 +267,28 @@ export const PropertyDetailPage: React.FC<Props> = ({
                 Score de Viabilidad MiLocal
               </h4>
 
-              {/* Match loading */}
-              {isLoadingMatch && (
+              {/* Not authenticated */}
+              {!isAuthenticated && (
+                <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 text-center relative">
+                  <div className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                    <Lock className="text-slate-300" size={24} />
+                  </div>
+                  <p className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-2">Compatibilidad</p>
+                  <p className="text-xs text-slate-400 font-medium mb-8 leading-relaxed">
+                    Inicia sesión para ver el score de compatibilidad detallado con esta propiedad.
+                  </p>
+                  <button
+                    onClick={() => onNavigate('login')}
+                    className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-[11px] uppercase tracking-[0.15em] hover:bg-[#FBB03B] hover:text-slate-900 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-2"
+                    aria-label="Iniciar sesión"
+                  >
+                    <LogIn size={16} /> Iniciar Sesión
+                  </button>
+                </div>
+              )}
+
+              {/* Match loading — only authenticated */}
+              {isAuthenticated && isLoadingMatch && (
                 <div className="space-y-4">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="flex items-center justify-between p-5 bg-slate-50/80 rounded-2xl border border-slate-100 animate-pulse">
@@ -249,16 +302,16 @@ export const PropertyDetailPage: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* Match error */}
-              {!isLoadingMatch && matchError && (
+              {/* Match error — only authenticated */}
+              {isAuthenticated && !isLoadingMatch && matchError && (
                 <div className="text-center py-6">
                   <AlertTriangle size={24} className="text-yellow-500 mx-auto mb-3" />
                   <p className="text-xs font-bold text-slate-500">No se pudo calcular el match. Mostrando análisis básico.</p>
                 </div>
               )}
 
-              {/* Real breakdown from API */}
-              {!isLoadingMatch && !matchError && breakdown.length > 0 && (
+              {/* Real breakdown from API — only authenticated */}
+              {isAuthenticated && !isLoadingMatch && !matchError && breakdown.length > 0 && (
                 <div className="space-y-4">
                   {breakdown.map((item) => {
                     const ratio = item.maxWeight > 0 ? item.score / item.maxWeight : 0;
@@ -292,8 +345,8 @@ export const PropertyDetailPage: React.FC<Props> = ({
                 </div>
               )}
 
-              {/* Fallback when no match data */}
-              {!isLoadingMatch && !matchError && breakdown.length === 0 && (
+              {/* Fallback when authenticated but no match data */}
+              {isAuthenticated && !isLoadingMatch && !matchError && breakdown.length === 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-5 bg-slate-50/80 rounded-2xl border border-slate-100">
                     <div className="flex items-center gap-3">
@@ -355,7 +408,24 @@ export const PropertyDetailPage: React.FC<Props> = ({
             </div>
 
             <div className="space-y-4">
-              {userProfile.level === 0 ? (
+              {!isAuthenticated ? (
+                <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 text-center relative">
+                  <div className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                    <Lock className="text-slate-300" size={24} />
+                  </div>
+                  <p className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-2">Acceso Restringido</p>
+                  <p className="text-xs text-slate-400 font-medium mb-8 leading-relaxed">
+                    Inicia sesión para solicitar visitas y enviar propuestas formales.
+                  </p>
+                  <button
+                    onClick={() => onNavigate('login')}
+                    className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-[11px] uppercase tracking-[0.15em] hover:bg-[#FBB03B] hover:text-slate-900 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-2"
+                    aria-label="Iniciar sesión"
+                  >
+                    <LogIn size={16} /> Iniciar Sesión
+                  </button>
+                </div>
+              ) : userProfile.level === 0 ? (
                 <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 text-center relative">
                   <div className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center mx-auto mb-4 border border-slate-100">
                     <Lock className="text-slate-300" size={24} />
@@ -374,10 +444,18 @@ export const PropertyDetailPage: React.FC<Props> = ({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <button className="w-full py-6 bg-slate-900 text-[#FBB03B] rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3" aria-label="Solicitar visita a la propiedad">
+                  <button
+                    onClick={() => handleContact('visit')}
+                    className="w-full py-6 bg-slate-900 text-[#FBB03B] rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3"
+                    aria-label="Solicitar visita a la propiedad"
+                  >
                     Solicitar Visita <ArrowRight size={20} />
                   </button>
-                  <button className="w-full py-6 bg-white text-slate-900 border-2 border-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-3" aria-label="Enviar propuesta formal">
+                  <button
+                    onClick={() => handleContact('proposal')}
+                    className="w-full py-6 bg-white text-slate-900 border-2 border-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-3"
+                    aria-label="Enviar propuesta formal"
+                  >
                     Enviar Propuesta Formal
                   </button>
                 </div>
@@ -386,6 +464,16 @@ export const PropertyDetailPage: React.FC<Props> = ({
           </div>
         </div>
       </div>
+
+      <ContactModal
+        isOpen={contactModalOpen}
+        onClose={() => setContactModalOpen(false)}
+        propertyId={propertyId}
+        propertyTitle={property?.title || ''}
+        userName={userProfile?.name || ''}
+        userEmail={userProfile?.email || ''}
+        type={contactType}
+      />
     </div>
   );
 };

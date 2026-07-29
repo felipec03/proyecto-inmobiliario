@@ -2,12 +2,18 @@ package middleware
 
 import "net/http"
 
+var allowedOrigins = map[string]bool{
+	"http://localhost:5173":              true,
+	"http://localhost:3001":              true,
+	"https://matchinmobiliario.fcadev.cl": true,
+}
+
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		allowedOrigin := "*"
-		if origin != "" {
+		allowedOrigin := ""
+		if origin != "" && allowedOrigins[origin] {
 			allowedOrigin = origin
 		}
 

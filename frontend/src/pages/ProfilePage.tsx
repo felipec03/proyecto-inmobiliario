@@ -11,6 +11,7 @@ export function ProfilePage() {
   const { profile, updateProfile, isAuthenticated } = useAuth();
   const { addToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [verifyingDocs, setVerifyingDocs] = useState<Set<string>>(new Set());
 
   // Use auth profile if available, otherwise fallback
   const defaultProfile = profile;
@@ -36,7 +37,7 @@ export function ProfilePage() {
         addToast('success', 'Documento subido exitosamente');
 
         const newDocs = profile.documents.map((doc) =>
-          doc.id === docId ? { ...doc, status: 'verified' as const } : doc
+          doc.id === docId ? { ...doc, status: 'pending' as const } : doc
         );
         updateProfile({ ...profile, documents: newDocs });
       } catch (err) {
@@ -49,14 +50,31 @@ export function ProfilePage() {
   );
 
   const handleVerifyDocument = useCallback(
-    (docId: string) => {
-      if (!profile) return;
+    async (docId: string) => {
+      if (!profile) {
+        addToast('error', 'Debes iniciar sesión para verificar documentos');
+        return;
+      }
 
-      const newDocs = profile.documents.map((doc) =>
-        doc.id === docId ? { ...doc, status: 'verified' as const } : doc
-      );
-      updateProfile({ ...profile, documents: newDocs });
-      addToast('success', 'Documento marcado como verificado');
+      setVerifyingDocs((prev) => new Set(prev).add(docId));
+
+      try {
+        await api.verifyDocument(profile.id, docId);
+        const newDocs = profile.documents.map((doc) =>
+          doc.id === docId ? { ...doc, status: 'verified' as const } : doc
+        );
+        updateProfile({ ...profile, documents: newDocs });
+        addToast('success', 'Documento verificado exitosamente');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Error al verificar el documento';
+        addToast('error', msg);
+      } finally {
+        setVerifyingDocs((prev) => {
+          const next = new Set(prev);
+          next.delete(docId);
+          return next;
+        });
+      }
     },
     [profile, updateProfile, addToast]
   );
@@ -126,7 +144,7 @@ export function ProfilePage() {
               <div className="absolute top-0 right-0 w-24 h-24 bg-[#FBB03B]/5 rounded-bl-full -z-0" />
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 relative z-10">Match Index Promedio</p>
               <div className="flex items-center justify-between relative z-10">
-                <h3 className="text-4xl font-black text-[#FBB03B]">84%</h3>
+                <h3 className="text-4xl font-black text-[#FBB03B]">—</h3>
                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-md">
                   <Target className="text-[#FBB03B]" size={24} />
                 </div>
@@ -151,6 +169,7 @@ export function ProfilePage() {
                   <DocumentCard
                     key={doc.id}
                     doc={doc}
+                    isVerifying={verifyingDocs.has(doc.id)}
                     onVerify={handleVerifyDocument}
                     onUpload={handleDocumentUpload}
                   />

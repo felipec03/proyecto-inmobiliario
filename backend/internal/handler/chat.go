@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+
 	"milocal/backend/internal/model"
 	"milocal/backend/internal/service"
 )
@@ -10,7 +11,7 @@ import (
 func Chat(w http.ResponseWriter, r *http.Request) {
 	var req model.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		sanitizedError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
 
@@ -24,7 +25,7 @@ func Chat(w http.ResponseWriter, r *http.Request) {
 
 	responseText, err := service.ChatWithGemini(req.Prompt, history, req.Rubro)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Gemini API error", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Gemini API error", err)
 		return
 	}
 
@@ -41,7 +42,7 @@ func GetTrends(w http.ResponseWriter, r *http.Request) {
 
 	responseText, err := service.GetCommercialMarketTrends(city)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Gemini API error", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Gemini API error", err)
 		return
 	}
 

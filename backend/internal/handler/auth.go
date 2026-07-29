@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -15,22 +13,10 @@ import (
 	"milocal/backend/internal/repository"
 )
 
-func generateUUID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return hex.EncodeToString(b[0:4]) + "-" +
-		hex.EncodeToString(b[4:6]) + "-" +
-		hex.EncodeToString(b[6:8]) + "-" +
-		hex.EncodeToString(b[8:10]) + "-" +
-		hex.EncodeToString(b[10:16])
-}
-
 func Register(w http.ResponseWriter, r *http.Request) {
 	var req model.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		sanitizedError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
 
@@ -55,7 +41,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	existing, err := repository.GetUserByEmail(req.Email)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error checking email", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error checking email", err)
 		return
 	}
 	if existing != nil {
@@ -65,7 +51,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error hashing password", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error hashing password", err)
 		return
 	}
 
@@ -80,13 +66,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := repository.CreateUser(user); err != nil {
-		writeError(w, http.StatusInternalServerError, "Error creating user", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error creating user", err)
 		return
 	}
 
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error generating token", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error generating token", err)
 		return
 	}
 
@@ -106,7 +92,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 func Login(w http.ResponseWriter, r *http.Request) {
 	var req model.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		sanitizedError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
 
@@ -120,7 +106,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := repository.GetUserByEmail(req.Email)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error fetching user", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error fetching user", err)
 		return
 	}
 	if user == nil {
@@ -135,7 +121,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	token, err := auth.GenerateToken(user.ID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error generating token", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error generating token", err)
 		return
 	}
 
@@ -161,7 +147,7 @@ func Me(w http.ResponseWriter, r *http.Request) {
 
 	user, err := repository.GetUserByID(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error fetching user", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error fetching user", err)
 		return
 	}
 	if user == nil {

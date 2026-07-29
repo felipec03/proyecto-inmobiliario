@@ -20,32 +20,9 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import type { BusinessRubro, UserProfile } from '@/types';
 
 // ------------------------------------------------------------------
-// Public pages (login / register) — no sidebar
+// Main app layout — with sidebar, always rendered, handles auth
 // ------------------------------------------------------------------
-function PublicLayout() {
-  return (
-    <AnimatePresence mode="wait">
-      <Routes>
-        <Route path="/login" element={
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-            <LoginPage />
-          </motion.div>
-        } />
-        <Route path="/register" element={
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-            <RegisterPage />
-          </motion.div>
-        } />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </AnimatePresence>
-  );
-}
-
-// ------------------------------------------------------------------
-// Protected layout — with sidebar, toast, auth
-// ------------------------------------------------------------------
-function ProtectedLayout() {
+function AppLayout() {
   const { user, profile, isAuthenticated, isLoading, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,6 +40,14 @@ function ProtectedLayout() {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
+
+  // Protect internal tab navigation for auth-gated pages
+  useEffect(() => {
+    const protectedTabs = ['onboarding', 'profile', 'chat'];
+    if (!isLoading && !isAuthenticated && protectedTabs.includes(activeTab)) {
+      navigate('/login', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, activeTab, navigate]);
 
   const handleNavigate = useCallback((tab: string) => {
     setActiveTab(tab);
@@ -96,13 +81,9 @@ function ProtectedLayout() {
     );
   }
 
-  // Not authenticated — redirect to login
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
   const renderContent = () => {
     if (activeTab === 'onboarding') {
+      if (!isAuthenticated) return null; // Will be redirected by useEffect
       return (
         <motion.div
           key="onboarding"
@@ -129,7 +110,7 @@ function ProtectedLayout() {
             propertyId={selectedPropertyId}
             selectedRubro={selectedRubro}
             userProfile={profile || {
-              id: user?.id || 'u1',
+              id: user?.id || 'anon',
               name: user?.name || '',
               email: user?.email || '',
               type: user?.type || 'entrepreneur',
@@ -137,6 +118,7 @@ function ProtectedLayout() {
               subType: 'natural',
               documents: [],
             }}
+            isAuthenticated={isAuthenticated}
             onBack={handleBack}
             onNavigate={(tab) => { setActiveTab(tab); setSelectedPropertyId(null); }}
           />
@@ -155,13 +137,24 @@ function ProtectedLayout() {
         >
           {activeTab === 'home' && (
             <HomePage
-              onNavigate={handleNavigate}
+              isAuthenticated={isAuthenticated}
+              onNavigate={(tab) => {
+                if (!isAuthenticated && ['onboarding', 'profile', 'chat'].includes(tab)) {
+                  navigate('/login');
+                  return;
+                }
+                handleNavigate(tab);
+              }}
               onSelectProperty={handleSelectProperty}
             />
           )}
-          {activeTab === 'chat' && <ChatPage selectedRubro={selectedRubro} />}
+          {activeTab === 'chat' && (
+            isAuthenticated ? <ChatPage selectedRubro={selectedRubro} /> : null
+          )}
           {activeTab === 'trends' && <TrendsPage />}
-          {activeTab === 'profile' && <ProfilePage />}
+          {activeTab === 'profile' && (
+            isAuthenticated ? <ProfilePage /> : null
+          )}
           {activeTab === 'visual' && (
             <div className="flex items-center justify-center h-96">
               <div className="text-center">
@@ -191,24 +184,38 @@ function ProtectedLayout() {
         </button>
       </div>
 
-      {/* Trust Level */}
-      <div className="mb-8 p-5 bg-slate-50 rounded-3xl border border-slate-100 relative overflow-hidden group">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel Inquilino</span>
-          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${(profile?.level ?? 0) === 1 ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
-            {(profile?.level ?? 0) === 0 ? 'LEVEL 0' : 'VERIFICADO'}
-          </span>
+      {/* Trust Level – only for authenticated users */}
+      {isAuthenticated && (
+        <div className="mb-8 p-5 bg-slate-50 rounded-3xl border border-slate-100 relative overflow-hidden group">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nivel Inquilino</span>
+            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${(profile?.level ?? 0) === 1 ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
+              {(profile?.level ?? 0) === 0 ? 'LEVEL 0' : 'VERIFICADO'}
+            </span>
+          </div>
+          <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+            <div className="h-full bg-[#FBB03B] transition-all duration-700 ease-out shadow-sm" style={{ width: `${progressPercent}%` }} />
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-[10px] font-black text-slate-900">{verifiedCount}/{totalDocs} Docs</p>
+            <button onClick={() => { handleNavigate('profile'); }} className="text-[9px] font-black text-[#FBB03B] uppercase tracking-widest hover:underline">
+              Completar
+            </button>
+          </div>
         </div>
-        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-          <div className="h-full bg-[#FBB03B] transition-all duration-700 ease-out shadow-sm" style={{ width: `${progressPercent}%` }} />
-        </div>
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-[10px] font-black text-slate-900">{verifiedCount}/{totalDocs} Docs</p>
-          <button onClick={() => { handleNavigate('profile'); }} className="text-[9px] font-black text-[#FBB03B] uppercase tracking-widest hover:underline">
-            Completar
+      )}
+
+      {!isAuthenticated && (
+        <div className="mb-8 p-5 bg-[#FBB03B]/10 rounded-3xl border border-[#FBB03B]/20 text-center">
+          <p className="text-[11px] font-black text-slate-700 mb-3">Descubre tu compatibilidad</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="w-full py-3 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-[#FBB03B] hover:text-slate-900 transition-all shadow-md"
+          >
+            Iniciar Sesión
           </button>
         </div>
-      </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1">
@@ -219,33 +226,48 @@ function ProtectedLayout() {
         <SidebarLink icon={<Camera />} label="Visual Analyzer" active={activeTab === 'visual'} onClick={() => handleNavigate('visual')} />
       </nav>
 
-      {/* User info + logout */}
-      <div className="mt-6 pt-6 border-t border-slate-50 space-y-3">
-        {/* User type toggle */}
-        <button
-          onClick={() => {
-            if (profile) {
-              const newType = profile.type === 'entrepreneur' ? 'owner' : 'entrepreneur';
-              updateProfile({ ...profile, type: newType as 'entrepreneur' | 'owner' });
-            }
-          }}
-          className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-slate-900 text-white hover:bg-[#FBB03B] hover:text-slate-900 transition-all font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-100"
-          aria-label={`Cambiar a ${profile?.type === 'entrepreneur' ? 'Propietario' : 'Emprendedor'}`}
-        >
-          <Briefcase size={14} />
-          {profile?.type === 'entrepreneur' ? 'Cambiar a Propietario' : 'Cambiar a Emprendedor'}
-        </button>
+      {/* User info + logout — only for authed users */}
+      {isAuthenticated && (
+        <div className="mt-6 pt-6 border-t border-slate-50 space-y-3">
+          {/* User type toggle */}
+          <button
+            onClick={() => {
+              if (profile) {
+                const newType = profile.type === 'entrepreneur' ? 'owner' : 'entrepreneur';
+                updateProfile({ ...profile, type: newType as 'entrepreneur' | 'owner' });
+              }
+            }}
+            className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-slate-900 text-white hover:bg-[#FBB03B] hover:text-slate-900 transition-all font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-100"
+            aria-label={`Cambiar a ${profile?.type === 'entrepreneur' ? 'Propietario' : 'Emprendedor'}`}
+          >
+            <Briefcase size={14} />
+            {profile?.type === 'entrepreneur' ? 'Cambiar a Propietario' : 'Cambiar a Emprendedor'}
+          </button>
 
-        {/* Logout */}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl border-2 border-red-100 text-red-500 hover:bg-red-50 transition-all font-black text-[10px] uppercase tracking-widest"
-          aria-label="Cerrar sesión"
-        >
-          <LogOut size={14} />
-          Cerrar Sesión
-        </button>
-      </div>
+          {/* User badge */}
+          <div className="flex items-center gap-3 px-2 py-3">
+            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center">
+              <User size={16} className="text-[#FBB03B]" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-900 leading-none">{profile?.name || 'Usuario'}</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
+                {profile?.type === 'entrepreneur' ? 'Emprendedor' : 'Propietario'}
+              </p>
+            </div>
+          </div>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl border-2 border-red-100 text-red-500 hover:bg-red-50 transition-all font-black text-[10px] uppercase tracking-widest"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut size={14} />
+            Cerrar Sesión
+          </button>
+        </div>
+      )}
     </>
   );
 
@@ -332,7 +354,7 @@ function AppContent() {
   return (
     <AnimatePresence mode="wait">
       <Routes>
-        {/* Public routes */}
+        {/* Public routes — always accessible */}
         <Route
           path="/login"
           element={
@@ -358,15 +380,13 @@ function AppContent() {
           }
         />
 
-        {/* Protected routes */}
+        {/* Main app — public, with sidebar */}
         <Route
           path="/*"
           element={
-            isAuthenticated ? (
-              <ProtectedLayout />
-            ) : (
-              <Navigate to="/login" replace />
-            )
+            <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+              <AppLayout />
+            </motion.div>
           }
         />
       </Routes>

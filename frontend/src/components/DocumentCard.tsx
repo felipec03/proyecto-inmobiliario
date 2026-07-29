@@ -4,6 +4,7 @@ import type { Document } from '@/types';
 
 interface Props {
   doc: Document;
+  isVerifying?: boolean;
   onVerify: (docId: string) => void;
   onUpload?: (docId: string, file: File) => Promise<void>;
 }
@@ -17,7 +18,7 @@ const ALLOWED_TYPES = [
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
-export const DocumentCard: React.FC<Props> = ({ doc, onVerify, onUpload }) => {
+export const DocumentCard: React.FC<Props> = ({ doc, isVerifying = false, onVerify, onUpload }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
@@ -59,10 +60,12 @@ export const DocumentCard: React.FC<Props> = ({ doc, onVerify, onUpload }) => {
   };
 
   const handleClick = () => {
-    if (doc.status !== 'verified' && !isUploading) {
+    if (doc.status !== 'verified' && !isUploading && !isVerifying) {
       fileInputRef.current?.click();
     }
   };
+
+  const isBusy = isUploading || isVerifying;
 
   return (
     <div className="flex items-center justify-between p-8 bg-slate-50/50 border border-slate-100 rounded-[2.5rem] group hover:bg-white hover:shadow-2xl transition-all duration-500">
@@ -74,18 +77,36 @@ export const DocumentCard: React.FC<Props> = ({ doc, onVerify, onUpload }) => {
               : 'bg-white text-slate-300 shadow-inner'
           }`}
         >
-          {doc.status === 'verified' ? <CheckCircle size={40} /> : <FileText size={40} />}
+          {isVerifying ? (
+            <Loader2 size={40} className="animate-spin text-[#FBB03B]" />
+          ) : doc.status === 'verified' ? (
+            <CheckCircle size={40} />
+          ) : (
+            <FileText size={40} />
+          )}
         </div>
         <div>
           <h5 className="text-lg font-black text-slate-900 mb-1">{doc.name}</h5>
           <div className="flex items-center gap-2">
             <div
               className={`w-2 h-2 rounded-full ${
-                doc.status === 'verified' ? 'bg-green-500' : doc.status === 'pending' ? 'bg-blue-400' : 'bg-slate-300'
+                isVerifying
+                  ? 'bg-[#FBB03B] animate-pulse'
+                  : doc.status === 'verified'
+                  ? 'bg-green-500'
+                  : doc.status === 'pending'
+                  ? 'bg-blue-400'
+                  : 'bg-slate-300'
               }`}
             />
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {doc.status === 'empty' ? 'Pendiente Carga' : doc.status === 'pending' ? 'En Revisión' : 'Documento Validado'}
+              {isVerifying
+                ? 'Verificando...'
+                : doc.status === 'empty'
+                ? 'Pendiente Carga'
+                : doc.status === 'pending'
+                ? 'En Revisión'
+                : 'Documento Validado'}
             </span>
           </div>
           {error && (
@@ -107,13 +128,13 @@ export const DocumentCard: React.FC<Props> = ({ doc, onVerify, onUpload }) => {
       {doc.status !== 'verified' ? (
         <button
           onClick={handleClick}
-          disabled={isUploading}
+          disabled={isBusy}
           className="px-8 py-4 bg-white border-2 border-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all shadow-md flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#FBB03B] focus:ring-offset-2"
           aria-label={`Subir archivo: ${doc.name}`}
         >
-          {isUploading ? (
+          {isBusy ? (
             <>
-              <Loader2 size={14} className="animate-spin" /> Subiendo...
+              <Loader2 size={14} className="animate-spin" /> {isVerifying ? 'Verificando...' : 'Subiendo...'}
             </>
           ) : (
             <>
@@ -128,4 +149,4 @@ export const DocumentCard: React.FC<Props> = ({ doc, onVerify, onUpload }) => {
       )}
     </div>
   );
-}
+};

@@ -1,0 +1,516 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[margin=2.54cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textbf{MiLocal — Trust \& Match}}
+\fancyhead[R]{\textbf{Project Charter}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\vspace{-2cm}\textbf{Project Charter \\ MiLocal — Trust \& Match}}
+\author{
+    \textbf{Plataforma de Matchmaking Inmobiliario Comercial} \\
+    \textbf{Stack:} Go 1.23 + PostgreSQL 16 + React 19 + TypeScript 5.8 \\
+    \textbf{URL:} \url{https://matchinmobiliario.fcadev.cl} \\
+    \\
+    \textbf{Versión:} 1.0 — Julio 2026
+}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+\newpage
+
+\tableofcontents
+\newpage
+
+% ===================================================================
+\section{Resumen Ejecutivo}
+% ===================================================================
+
+\textbf{MiLocal — Trust \& Match} es una plataforma B2B de \textit{matchmaking inmobiliario comercial} que conecta emprendedores con propietarios de locales en Chile. El producto utiliza un motor de \textbf{Weighted Feature Distance} que evalúa 10 dimensiones técnicas y de preferencias para calcular un puntaje de compatibilidad entre cada inmueble y el rubro del negocio.
+
+\textbf{Propuesta de valor:}
+\begin{itemize}
+    \item \textbf{Para emprendedores:} Encontrar el local óptimo para su rubro sin arriesgar capital en un espacio técnicamente incompatible.
+    \item \textbf{Para propietarios:} Reducir la vacancia conectando sus inmuebles con arrendatarios precalificados cuyo negocio sea compatible con las especificaciones del local.
+\end{itemize}
+
+\textbf{Diferenciador técnico:} A diferencia de portales inmobiliarios genéricos (PortalInmobiliario, MercadoLibre), MiLocal no rankea por precio o ubicación, sino por \textbf{compatibilidad técnica}: ¿tiene el local las conexiones, dimensiones y permisos que tu negocio necesita?
+
+\vspace{0.5cm}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.3\hsize}X >{\hsize=0.7\hsize}X}
+        \toprule
+        \textbf{Atributo} & \textbf{Valor} \\
+        \midrule
+        Nombre del proyecto & MiLocal — Trust \& Match \\
+        Tipo de plataforma & SPA + API REST \\
+        Mercado objetivo & Chile (Región Metropolitana, fase inicial) \\
+        Usuarios objetivo & Emprendedores comerciales + Propietarios de locales \\
+        Stack tecnológico & Go 1.23 + PostgreSQL 16 + React 19 + TypeScript 5.8 + Vite 6 + Tailwind CSS \\
+        Infraestructura & Docker Compose (3 servicios) + Jenkins CI/CD + Nginx reverse proxy \\
+        Repositorio & \url{https://github.com/felipecubillos/proyecto-inmobiliario} \\
+        Estado actual & MVP — Julio 2026 (55\% backend, 65\% frontend) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ===================================================================
+\section{Identificación del Problema}
+% ===================================================================
+
+\subsection{5 Whys — Análisis de Causa Raíz}
+
+\begin{enumerate}
+    \item \textbf{¿Por qué los emprendedores fracasan en su primer local?} Porque el local no era técnicamente adecuado para su rubro.
+    \item \textbf{¿Por qué eligen un local inadecuado?} Porque no tienen conocimiento técnico sobre los requerimientos específicos de su rubro.
+    \item \textbf{¿Por qué no tienen ese conocimiento?} Porque los portales inmobiliarios no muestran especificaciones técnicas ni evalúan compatibilidad.
+    \item \textbf{¿Por qué los portales no lo hacen?} Porque su modelo de negocio se basa en volumen de publicaciones, no en calidad de match.
+    \item \textbf{¿Por qué no hay una alternativa?} Porque el mercado de Real Estate comercial en LatAm no ha adoptado sistemas de recomendación basados en datos.
+\end{enumerate}
+
+\subsection{Stakeholders}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.2\hsize}X >{\hsize=0.4\hsize}X >{\hsize=0.4\hsize}X}
+        \toprule
+        \textbf{Rol} & \textbf{Necesidad} & \textbf{Métrica de éxito} \\
+        \midrule
+        Emprendedor & Encontrar local compatible con su rubro & Tasa de match $>$ 80\% \\
+        Propietario & Reducir tiempo de vacancia & Días hasta primer contacto \\
+        Admin plataforma & Gestionar catálogo y verificar documentos & Trust Level de usuarios \\
+        Inversionista & ROI de la plataforma & Contratos cerrados vía la plataforma \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ===================================================================
+\section{Alcance del Producto}
+% ===================================================================
+
+\subsection{MVP — Incluido (Julio 2026)}
+
+\begin{itemize}
+    \item Registro y autenticación de usuarios (JWT + bcrypt)
+    \item Publicación de inmuebles con especificaciones técnicas (7 dimensiones)
+    \item Motor de matchmaking Weighted Feature Distance (10 dimensiones, 6 rubros)
+    \item Puntaje de compatibilidad con desglose explicable por dimensión
+    \item Regla dura: cap del 29\% si el rubro no está en usos permitidos
+    \item Subida de documentos (identidad, ingresos, legales, propiedad)
+    \item Sistema de Trust Level (documentos verificados)
+    \item Perfil de usuario con preferencias guardadas
+    \item Onboarding/assessment para capturar rubro y necesidades
+    \item Búsqueda de inmuebles por rubro
+    \item Dashboard de tendencias de mercado (Chile)
+    \item Interfaz responsive (mobile + desktop)
+    \item Pipeline CI/CD con Jenkins
+\end{itemize}
+
+\subsection{Fuera de Alcance (MVP)}
+
+\begin{itemize}
+    \item Chat con inteligencia artificial (ON HOLD — pendiente decisión de proveedor LLM)
+    \item Visual Analyzer (análisis multimodal de fachadas)
+    \item Pasarela de pagos
+    \item Firma electrónica de contratos
+    \item Verificación biométrica de identidad
+    \item App móvil nativa
+    \item Soporte multi-país (foco exclusivo en Chile)
+\end{itemize}
+
+\subsection{Arquitectura Lógica}
+
+\begin{verbatim}
+┌──────────────────────────────────────────────────────────────────┐
+│                    Nginx (Reverse Proxy)                          │
+│  /api/* → backend:8080    /* → frontend:80                       │
+└──────────┬──────────────────────────────┬────────────────────────┘
+           │                              │
+           ▼                              ▼
+┌──────────────────────┐    ┌──────────────────────────────────────┐
+│  Backend (Go 1.23)   │    │  Frontend (React 19 + TS 5.8)       │
+│                      │    │                                      │
+│  cmd/server          │    │  src/pages/ (8 páginas)              │
+│  internal/           │    │  src/components/ (9 componentes)     │
+│    handler/ (7)      │    │  src/services/ (api.ts, gemini.ts)   │
+│    service/           │    │  src/hooks/ (useAuth)                │
+│      matcher/ (3)    │    │                                      │
+│    repository/ (5)    │    │  Vite 6 + Tailwind CSS              │
+│    middleware/ (2)    │    │  React Router v7 + motion            │
+│    auth/ (1)         │    │                                      │
+│    model/ (1)        │    │                                      │
+│                      │    │                                      │
+│  net/http stdlib      │    │                                      │
+│  lib/pq (PostgreSQL) │    │                                      │
+└──────────┬───────────┘    └──────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  PostgreSQL 16       │
+│                      │
+│  7 tablas:           │
+│  users, documents,   │
+│  properties, matches,│
+│  chat_history,       │
+│  assessments,        │
+│  user_preferences    │
+└──────────────────────┘
+\end{verbatim}
+
+% ===================================================================
+\section{Motor de Matchmaking}
+% ===================================================================
+
+\subsection{Weighted Feature Distance}
+
+El motor de matchmaking es el componente central de la plataforma. Evalúa la compatibilidad entre un inmueble y un rubro comercial mediante 10 dimensiones normalizadas en $[0,1]$.
+
+\subsubsection{Dimensiones Técnicas (7)}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.05\hsize}X >{\hsize=0.22\hsize}X >{\hsize=0.13\hsize}X >{\hsize=0.6\hsize}X}
+        \toprule
+        \textbf{\#} & \textbf{Dimensión} & \textbf{Tipo} & \textbf{Encoding} \\
+        \midrule
+        0 & Capacidad Eléctrica & Booleano & Básica = 0.0, Trifásica = 1.0 \\
+        1 & Conexión de Gas & Booleano & No = 0.0, Sí = 1.0 \\
+        2 & Conexión de Agua & Booleano & No = 0.0, Sí = 1.0 \\
+        3 & Trampa de Grasa & Booleano & No = 0.0, Sí = 1.0 \\
+        4 & Frente Comercial & Numérico & $\min(\text{metros}/20,\; 1.0)$ \\
+        5 & Flujo Peatonal & Ordinal & Bajo = 0.33, Medio = 0.66, Alto = 1.0 \\
+        6 & Precio Negociable & Booleano & No = 0.0, Sí = 1.0 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Dimensiones de Preferencias (3)}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.05\hsize}X >{\hsize=0.22\hsize}X >{\hsize=0.13\hsize}X >{\hsize=0.6\hsize}X}
+        \toprule
+        \textbf{\#} & \textbf{Dimensión} & \textbf{Tipo} & \textbf{Encoding} \\
+        \midrule
+        7 & Ajuste Presupuesto & Función & price $\leq$ budget → 1.0, $\leq 1.3\times$ → 0.7, $\leq 1.5\times$ → 0.4, else → 0.1 \\
+        8 & Ajuste Tamaño & Función & Sqm en rango → 1.0, $\pm 30\%$ → 0.6, else → 0.2 \\
+        9 & Match Ubicación & Similitud & Coincidencia exacta → 1.0, prefijo 3 letras → 0.8, palabra común → 0.6, else → 0.2 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsubsection{Fórmulas}
+
+\textbf{Score de Especificaciones:}
+\[
+\text{specScore} = \frac{\sum_{i=0}^{6} w_i \cdot (1 - |\text{actual}_i - \text{ideal}_i|)}{\sum_{i=0}^{6} w_i}
+\]
+
+\textbf{Score de Preferencias:}
+\[
+\text{userScore} = \frac{\sum_{j=0}^{2} uw_j \cdot (1 - |\text{userActual}_j - \text{userIdeal}_j|)}{\sum_{j=0}^{2} uw_j}
+\]
+
+\textbf{Score Final:}
+\[
+\text{finalScore} = \text{specScore} \cdot (1 - \alpha) + \text{userScore} \cdot \alpha
+\]
+
+Donde $\alpha = \text{RubroProfile.UserPrefWeights} \in [0.25, 0.35]$ según el rubro.
+
+\subsubsection{Perfiles de Rubro}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.1}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.18\hsize}X c c c c c c c}
+        \toprule
+        \textbf{Rubro} & \textbf{Potencia} & \textbf{Gas} & \textbf{Agua} & \textbf{Trampa} & \textbf{Frente} & \textbf{Tráfico} & \textbf{Negoc.} \\
+        \midrule
+        Gastronomía & 0.80 (10\%) & 1.00 (15\%) & 1.00 (10\%) & 1.00 (25\%) & 0.25 (5\%) & 0.80 (25\%) & 0.50 (10\%) \\
+        Belleza & 0.50 (10\%) & 0.30 (5\%) & 0.80 (25\%) & 0.00 (5\%) & 0.30 (15\%) & 0.80 (30\%) & 0.50 (10\%) \\
+        Retail & 0.50 (5\%) & 0.00 (0\%) & 0.30 (5\%) & 0.00 (0\%) & 0.50 (30\%) & 0.80 (30\%) & 0.70 (30\%) \\
+        Servicios & 0.60 (20\%) & 0.30 (5\%) & 0.60 (15\%) & 0.20 (5\%) & 0.20 (10\%) & 0.50 (20\%) & 0.50 (25\%) \\
+        Bodega & 0.50 (10\%) & 0.00 (0\%) & 0.30 (5\%) & 0.00 (0\%) & 0.60 (40\%) & 0.20 (15\%) & 0.60 (30\%) \\
+        Otro & 0.50 (15\%) & 0.50 (15\%) & 0.50 (15\%) & 0.30 (10\%) & 0.30 (10\%) & 0.50 (20\%) & 0.50 (15\%) \\
+        \bottomrule
+    \end{tabularx}
+    \caption{Vector ideal y peso (entre paréntesis) por dimensión técnica y rubro.}
+\end{table}
+
+\subsubsection{Reglas Duras}
+
+\begin{itemize}
+    \item \textbf{Cap del 29\%:} Si el rubro no está en \texttt{permitted\_uses} de la propiedad, el score se capa en 0.29.
+    \item \textbf{Perfil default:} Si un rubro no tiene perfil definido, se usa ``Otro'' como fallback.
+    \item \textbf{Neutralidad:} Preferencias de usuario ausentes → score neutral de 0.5.
+\end{itemize}
+
+\subsubsection{Path a Machine Learning}
+
+\begin{enumerate}
+    \item \textbf{Recolección de labels:} $\geq 500$ matches con outcome conocido (\texttt{closed\_won}/\texttt{closed\_lost}).
+    \item \textbf{Entrenamiento:} XGBoost con 10 features vectorizados + interacciones rubro $\times$ feature.
+    \item \textbf{Shadow mode:} ML corre en paralelo sin afectar al usuario. Comparación de scores durante 2-4 semanas.
+    \item \textbf{Cutover:} Si ML supera reglas en $> 5\%$ de tasa de conversión ($p < 0.05$), se promueve a primary scorer.
+\end{enumerate}
+
+% ===================================================================
+\section{Base de Datos}
+% ===================================================================
+
+\subsection{Diagrama de Entidad-Relación}
+
+\begin{verbatim}
+users ─── 1:N ─── documents
+  │
+  ├── 1:1 ─── user_preferences  (rubro, maxBudget, minSize, maxSize, commune_id)
+  ├── 1:N ─── assessments       (userType, step, data JSONB, completed)
+  ├── 1:N ─── matches           (property_id, rubro, score)
+  ├── 1:N ─── chat_history      (role, content)
+
+properties ── N:1 ── users (owner_id)
+\end{verbatim}
+
+\subsection{Tablas}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.2\hsize}X >{\hsize=0.2\hsize}X >{\hsize=0.6\hsize}X}
+        \toprule
+        \textbf{Tabla} & \textbf{Registros} & \textbf{Descripción} \\
+        \midrule
+        users & 2 (seed) + N & Emprendedores y propietarios. Password con bcrypt. \\
+        documents & 3 por usuario & Documentos de verificación (identidad, ingresos, legales, propiedad). \\
+        properties & 6 (seed) & Inmuebles comerciales con 24 columnas de especificaciones técnicas. \\
+        matches & N & Historial de puntajes calculados. \\
+        assessments & N & Respuestas del wizard de onboarding (JSONB). \\
+        user\_preferences & 1 por usuario & Preferencias guardadas: rubro, presupuesto, tamaño, comuna. \\
+        chat\_history & N & Historial de conversaciones con el asistente (placeholder). \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ===================================================================
+\section{API REST}
+% ===================================================================
+
+\subsection{Inventario de Endpoints}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.08\hsize}X >{\hsize=0.25\hsize}X >{\hsize=0.1\hsize}X >{\hsize=0.12\hsize}X >{\hsize=0.45\hsize}X}
+        \toprule
+        \textbf{\#} & \textbf{Endpoint} & \textbf{Método} & \textbf{Auth} & \textbf{Descripción} \\
+        \midrule
+        1 & /health & GET & No & Health check con DB ping \\
+        2 & /auth/register & POST & No & Registro con JWT \\
+        3 & /auth/login & POST & No & Login con JWT \\
+        4 & /auth/me & GET & JWT & Perfil del usuario autenticado \\
+        5 & /properties & GET & No & Listar inmuebles (?rubro=) \\
+        6 & /properties/\{id\} & GET & No & Detalle de inmueble \\
+        7 & /properties & POST & JWT & Publicar inmueble (solo owner) \\
+        8 & /users/\{id\} & GET & JWT & Perfil de usuario + documentos \\
+        9 & /users/\{id\} & PUT & JWT & Actualizar perfil (solo propio) \\
+        10 & /users/\{id\}/documents/\{did\}/verify & POST & JWT & Verificar documento (solo propio) \\
+        11 & /users/\{id\}/preferences & GET & JWT & Obtener preferencias \\
+        12 & /users/\{id\}/preferences & PUT & JWT & Guardar preferencias (solo propio) \\
+        13 & /upload/document/\{id\} & POST & JWT & Subir documento (solo propio) \\
+        14 & /upload/property-image/\{id\} & POST & JWT & Subir imagen (solo dueño) \\
+        15 & /match & POST & JWT & Calcular compatibilidad \\
+        16 & /assessment & POST & JWT & Guardar evaluación de onboarding \\
+        17 & /properties/\{id\}/contact & POST & JWT & Solicitar visita/propuesta \\
+        18 & /chat & POST & No & {[}PLACEHOLDER{]} Asistente IA \\
+        19 & /trends & GET & No & {[}PLACEHOLDER{]} Tendencias \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\textbf{Especificación completa:} \texttt{docs/api/openapi.yaml} (OpenAPI 3.0.3, 19 endpoints).
+
+% ===================================================================
+\section{Seguridad}
+% ===================================================================
+
+\subsection{Autenticación y Autorización}
+
+\begin{itemize}
+    \item \textbf{JWT HS256:} Tokens firmados con secreto configurable vía \texttt{JWT\_SECRET}. Expiración: 24 horas.
+    \item \textbf{Bcrypt:} Passwords hasheados con costo 10. Nunca se serializan en respuestas JSON (\texttt{json:"-"}).
+    \item \textbf{RBAC básico:} Ownership checks en todos los endpoints de escritura. El \texttt{userID} del JWT debe coincidir con el recurso accedido.
+    \item \textbf{Control de tipo:} Solo usuarios \texttt{type=owner} pueden publicar propiedades.
+\end{itemize}
+
+\subsection{Matriz de Riesgos (ISO 27001)}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.3\hsize}X >{\hsize=0.15\hsize}X >{\hsize=0.15\hsize}X >{\hsize=0.4\hsize}X}
+        \toprule
+        \textbf{Riesgo} & \textbf{Prob.} & \textbf{Impacto} & \textbf{Mitigación} \\
+        \midrule
+        Fuga de datos personales & Media & Alto & Auth en todos los endpoints de lectura de usuarios \\
+        Suplantación de identidad & Baja & Alto & JWT + bcrypt + verificación de documentos \\
+        SQL Injection & Baja & Crítico & Queries parametrizadas en todo el código \\
+        File upload malicioso & Media & Alto & Whitelist de extensiones + límite 10MB \\
+        API key expuesta en frontend & Alta & Alto & ChatPage migrado a backend; placeholder activo \\
+        Denegación de servicio & Media & Medio & Rate limiting pendiente (post-MVP) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ===================================================================
+\section{Infraestructura y DevOps}
+% ===================================================================
+
+\subsection{Docker Compose}
+
+\begin{verbatim}
+Servicios:
+  postgres (milocal-db)     postgres:16-alpine    :5434 → :5432
+  backend  (milocal-api)    Go 1.23 binary        :8082 → :8080
+  frontend (milocal-web)    Nginx + SPA            :3001 → :80
+\end{verbatim}
+
+\subsection{CI/CD (Jenkins)}
+
+\begin{enumerate}
+    \item \textbf{Trigger:} Webhook en push a \texttt{main} vía \texttt{githubPush()}.
+    \item \textbf{Build:} \texttt{docker compose build --no-cache} para backend y frontend.
+    \item \textbf{Deploy:} \texttt{docker compose up -d} con healthcheck de PostgreSQL.
+    \item \textbf{Smoke test:} \texttt{curl /api/health} con reintentos (10 intentos, 3s intervalo).
+\end{enumerate}
+
+% ===================================================================
+\section{Cronograma del Proyecto}
+% ===================================================================
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.18\hsize}X >{\hsize=0.27\hsize}X >{\hsize=0.55\hsize}X}
+        \toprule
+        \textbf{Período} & \textbf{Fase} & \textbf{Entregables} \\
+        \midrule
+        Jul 1--7 & Scaffolding & Esquema DB, estructura Go, React, Docker Compose. \\
+        Jul 8--14 & Core + Matcher & CRUD propiedades/usuarios, motor WFD, 6 perfiles de rubro. \\
+        Jul 15--21 & Auth + Upload & JWT, bcrypt, file upload, CORS, endpoints de auth. \\
+        Jul 22--29 & Frontend + MVP & 8 páginas SPA, CI/CD, docs, integración real frontend-backend. \\
+        \midrule
+        Ago 1--7 & Seguridad & RBAC, sanitización de errores, graceful shutdown, CORS fix. \\
+        Ago 8--14 & Frontend fixes & CTAs funcionales, UF centralizado, correcciones Chile-only. \\
+        Ago 15--21 & Features + Calidad & Paginación, filtros, logger, CRUD completo de propiedades. \\
+        Ago 22--29 & Tests + Docs & Tests unitarios/integración, OpenAPI, deploy final. \\
+        \midrule
+        Sep 1--7 (tent.) & Beta cerrada & 10-15 usuarios piloto, recolección de feedback. \\
+        Sep 8--30 (tent.) & Iteración & Correcciones post-beta, features solicitadas. \\
+        Q4 2026 (tent.) & ML Phase 1 & Recolección de labels, entrenamiento XGBoost, shadow mode. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ===================================================================
+\section{Documentación del Proyecto}
+% ===================================================================
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.5\hsize}X >{\hsize=0.5\hsize}X}
+        \toprule
+        \textbf{Documento} & \textbf{Ubicación} \\
+        \midrule
+        Definición del Problema (5 Whys, stakeholders) & \texttt{docs/DEFINICION\_PROBLEMA.md} \\
+        Algoritmo de Matchmaking (especificación técnica) & \texttt{docs/matchmaking/ALGORITMO\_MATCHMAKING.md} \\
+        Plan de Matchmaking (evolución y ML path) & \texttt{docs/matchmaking/PLAN\_MATCHMAKING.md} \\
+        Planificación Matchmaking (LaTeX) & \texttt{docs/matchmaking/PLANIFICACION\_MATCHMAKING.tex} \\
+        API Reference (OpenAPI 3.0) & \texttt{docs/api/openapi.yaml} \\
+        Product Backlog (Scrum) & \texttt{docs/scrum/PRODUCT\_BACKLOG.md} \\
+        Fuera de Alcance LLM (IA on hold) & \texttt{docs/FUERA\_DE\_ALCANCE\_LLM.md} \\
+        Alternativas sin IA para Trends & \texttt{docs/trends/ALTERNATIVAS\_SIN\_IA.md} \\
+        Matriz de Riesgos (ISO 27001) & \texttt{docs/security/MATRIZ\_RIESGOS.md} \\
+        Política de Privacidad (Ley 19.628) & \texttt{docs/security/POLITICA\_PRIVACIDAD.md} \\
+        Catálogo de Servicios SLA (ITIL 4) & \texttt{docs/ops/CATALOGO\_SERVICIOS\_SLA.md} \\
+        RACI y Métricas (COBIT) & \texttt{docs/governance/RACI\_METRICAS.md} \\
+        Planificación Agosto 2026 & \texttt{docs/planning/AGOSTO\_2026.md} \\
+        Month Review Julio 2026 & \texttt{month-review.md} \\
+        To-Do (auditoría MVP) & \texttt{to-do.md} \\
+        \textbf{Project Charter (este documento)} & \texttt{docs/charter/PROJECT\_CHARTER.tex} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ===================================================================
+\section{Métricas de Éxito (COBIT RACI)}
+% ===================================================================
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.3\hsize}X >{\hsize=0.25\hsize}X >{\hsize=0.15\hsize}X >{\hsize=0.3\hsize}X}
+        \toprule
+        \textbf{KPI} & \textbf{Meta MVP} & \textbf{Frecuencia} & \textbf{Responsable} \\
+        \midrule
+        Tasa de match $>$ 80\% & $\geq$ 1 propiedad con score $>$ 0.80 por usuario & Por sesión & Motor (R) \\
+        Tiempo hasta primer contacto & $\leq$ 48h desde match & Por match & Plataforma (A) \\
+        Documentos verificados & 100\% de usuarios Level 1 & Por registro & Admin (R) \\
+        Uptime & 99.5\% & Mensual & DevOps (R) \\
+        Cobertura de tests & $\geq$ 30\% (motor + auth) & Por sprint & Engineering (R) \\
+        Errores no sanitizados & 0 leaks a cliente & Por release & Engineering (R) \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ===================================================================
+\section{Glosario}
+% ===================================================================
+
+\begin{itemize}
+    \item \textbf{WFD (Weighted Feature Distance):} Algoritmo de scoring que calcula la distancia ponderada entre las características reales de un inmueble y el perfil ideal de un rubro.
+    \item \textbf{Match:} Resultado del cálculo de compatibilidad entre un inmueble y un rubro, expresado como score 0-1.
+    \item \textbf{Breakdown:} Desglose del score por cada una de las 10 dimensiones, mostrando ideal vs real y la contribución al puntaje final.
+    \item \textbf{Trust Level:} Nivel de confianza del usuario (0 = no verificado, 1 = documentos verificados).
+    \item \textbf{Rubro:} Categoría de negocio comercial (Gastronomía, Retail, Belleza, Servicios, Bodega, Otro).
+    \item \textbf{UF (Unidad de Fomento):} Unidad de cuenta chilena reajustable por inflación. Usada en contratos de arriendo comercial.
+    \item \textbf{Comuna:} División administrativa de Chile. 346 comunas en 16 regiones.
+\end{itemize}
+
+% ===================================================================
+\section{Referencias}
+% ===================================================================
+
+\begin{itemize}
+    \item Ricci, F., Rokach, L., \& Shapira, B. (2011). \textit{Recommender Systems Handbook}. Springer. Capítulo 4: Content-Based Recommendation Systems.
+    \item Chen, T., \& Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. \textit{KDD 2016}.
+    \item ISO/IEC 27001:2022 — Information security, cybersecurity and privacy protection.
+    \item ITIL 4 — Service Value System. Axelos (2019).
+    \item COBIT 2019 — Governance and Management Objectives. ISACA.
+    \item Ley 19.628 — Sobre protección de la vida privada. Chile (1999).
+    \item Go 1.23 Standard Library: \texttt{net/http}, \texttt{crypto/rand}, \texttt{log/slog}. \url{https://pkg.go.dev/std}
+    \item PostgreSQL 16 Documentation: \url{https://www.postgresql.org/docs/16/}
+\end{itemize}
+
+\end{document}

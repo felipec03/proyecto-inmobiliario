@@ -3,6 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+
+	"milocal/backend/internal/middleware"
 	"milocal/backend/internal/model"
 	"milocal/backend/internal/repository"
 )
@@ -11,7 +13,7 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	user, err := repository.GetUserByID(id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error fetching user", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error fetching user", err)
 		return
 	}
 	if user == nil {
@@ -36,15 +38,23 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+
+	// P0-1: Authorization — JWT userID must match resource ID
+	jwtUserID := middleware.GetUserIDFromContext(r.Context())
+	if jwtUserID != id {
+		writeError(w, http.StatusForbidden, "No tienes permiso para modificar este perfil", "")
+		return
+	}
+
 	var req model.UpdateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		sanitizedError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
 
 	user, err := repository.UpdateUser(id, req)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error updating user", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error updating user", err)
 		return
 	}
 
@@ -55,9 +65,16 @@ func VerifyDocument(w http.ResponseWriter, r *http.Request) {
 	userID := r.PathValue("userId")
 	docID := r.PathValue("docId")
 
+	// P0-1: Authorization — JWT userID must match the resource owner
+	jwtUserID := middleware.GetUserIDFromContext(r.Context())
+	if jwtUserID != userID {
+		writeError(w, http.StatusForbidden, "No tienes permiso para modificar este perfil", "")
+		return
+	}
+
 	doc, err := repository.VerifyDocument(userID, docID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error verifying document", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error verifying document", err)
 		return
 	}
 

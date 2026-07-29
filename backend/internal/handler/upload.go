@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"milocal/backend/internal/middleware"
 	"milocal/backend/internal/repository"
 )
 
@@ -24,6 +25,13 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 	userID := r.PathValue("userId")
 	if userID == "" {
 		writeError(w, http.StatusBadRequest, "Missing userId", "")
+		return
+	}
+
+	// P0-1: Authorization — JWT userID must match the resource owner
+	jwtUserID := middleware.GetUserIDFromContext(r.Context())
+	if jwtUserID != userID {
+		writeError(w, http.StatusForbidden, "No tienes permiso para modificar este perfil", "")
 		return
 	}
 
@@ -50,7 +58,7 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 	uploadDir := filepath.Join("uploads", "documents", userID)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		writeError(w, http.StatusInternalServerError, "Error creating upload directory", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error creating upload directory", err)
 		return
 	}
 
@@ -59,13 +67,13 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 	dst, err := os.Create(filePath)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error creating file", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error creating file", err)
 		return
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
-		writeError(w, http.StatusInternalServerError, "Error saving file", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error saving file", err)
 		return
 	}
 
@@ -82,7 +90,7 @@ func UploadDocument(w http.ResponseWriter, r *http.Request) {
 
 	if docID != "" {
 		if err := repository.UpdateDocumentFilePath(docID, userID, filePath); err != nil {
-			writeError(w, http.StatusInternalServerError, "Error updating document", err.Error())
+			sanitizedError(w, http.StatusInternalServerError, "Error updating document", err)
 			return
 		}
 	}
@@ -101,6 +109,18 @@ func UploadPropertyImage(w http.ResponseWriter, r *http.Request) {
 	propertyID := r.PathValue("propertyId")
 	if propertyID == "" {
 		writeError(w, http.StatusBadRequest, "Missing propertyId", "")
+		return
+	}
+
+	// P0-1: Authorization — verify property owner matches JWT user
+	jwtUserID := middleware.GetUserIDFromContext(r.Context())
+	property, err := repository.GetPropertyByID(propertyID)
+	if err != nil {
+		sanitizedError(w, http.StatusNotFound, "Property not found", err)
+		return
+	}
+	if property.OwnerID != jwtUserID {
+		writeError(w, http.StatusForbidden, "No tienes permiso para modificar esta propiedad", "")
 		return
 	}
 
@@ -127,7 +147,7 @@ func UploadPropertyImage(w http.ResponseWriter, r *http.Request) {
 
 	uploadDir := filepath.Join("uploads", "properties", propertyID)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		writeError(w, http.StatusInternalServerError, "Error creating upload directory", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error creating upload directory", err)
 		return
 	}
 
@@ -136,20 +156,20 @@ func UploadPropertyImage(w http.ResponseWriter, r *http.Request) {
 
 	dst, err := os.Create(filePath)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Error creating file", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error creating file", err)
 		return
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
-		writeError(w, http.StatusInternalServerError, "Error saving file", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error saving file", err)
 		return
 	}
 
 	imageURL := "/" + filePath
 
 	if err := repository.UpdatePropertyImage(propertyID, imageURL); err != nil {
-		writeError(w, http.StatusInternalServerError, "Error updating property", err.Error())
+		sanitizedError(w, http.StatusInternalServerError, "Error updating property", err)
 		return
 	}
 

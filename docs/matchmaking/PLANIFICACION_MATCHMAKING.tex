@@ -1,0 +1,399 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage[margin=2.54cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{enumitem}
+
+\title{\vspace{-2cm}\textbf{Planificación del Motor de Matchmaking: \\ Weighted Feature Distance con Escalabilidad a Machine Learning}}
+\author{
+    \textbf{Proyecto:} MiLocal — Trust \& Match \\
+    \textbf{Stack:} Go 1.23 + PostgreSQL 16 + React 19 + TypeScript 5.8 \\
+    \textbf{Repositorio:} \texttt{github.com/felipecubillos/proyecto-inmobiliario} \\
+}
+\date{31 de Julio de 2026}
+
+\begin{document}
+\maketitle
+
+\section{Identificación General del Motor}
+\begin{itemize}[label=\textbullet]
+    \item \textbf{Nombre del motor:} Weighted Feature Distance (WFD).
+    \item \textbf{Tipo de sistema:} Sistema de recomendación content-based con reglas duras.
+    \item \textbf{Problema que resuelve:} Dado un emprendedor con un rubro comercial y preferencias personales (presupuesto, tamaño, ubicación), rankear inmuebles disponibles según compatibilidad técnica y necesidades específicas del negocio.
+    \item \textbf{Objetivo general:} Proveer un puntaje de compatibilidad (\textit{match score}) entre 0 y 1 que sea explicable, escalable por rubro, personalizable por preferencias de usuario, y migrable a modelos supervisados cuando se acumulen datos históricos de contratos firmados.
+    \item \textbf{Hipótesis de diseño:} Cada rubro comercial tiene requerimientos técnicos distintos. Un sistema de pesos configurables por rubro, combinado con preferencias individuales del usuario, produce recomendaciones de mayor precisión que un ranking genérico por precio o ubicación.
+\end{itemize}
+
+\section{Comprensión del Problema}
+\begin{itemize}
+    \item \textbf{Qué fenómeno modelan:} La compatibilidad entre las especificaciones técnicas de un inmueble comercial y los requerimientos ideales de un rubro de negocio.
+    \item \textbf{Qué patrones buscan detectar:} Propiedades cuyas características técnicas (conexiones, dimensiones, flujo peatonal) maximicen el éxito operacional del rubro del emprendedor, penalizando aquellas cuyos usos permitidos excluyan el rubro.
+    \item \textbf{Por qué es adecuado WFD:} Porque cada rubro define su propio espacio de características ideales, permitiendo que el sistema escale horizontalmente al agregar nuevos rubros sin modificar el motor de cálculo. La trazabilidad por dimensión garantiza explicabilidad total ante el usuario final.
+    \item \textbf{Datos de entrada:} Especificaciones técnicas del inmueble (7 dimensiones) + preferencias del usuario (3 dimensiones) = vector de 10 features normalizadas en $[0, 1]$.
+\end{itemize}
+
+\textbf{Preguntas de diseño:}
+\begin{itemize}
+    \item \textbf{¿Cómo escalar a nuevos rubros sin redeploy?} Actualmente los perfiles están hardcodeados en \texttt{profiles.go}. La Fase 2 migrará los perfiles a la tabla \texttt{rubro\_profiles} en PostgreSQL, permitiendo CRUD administrativo.
+    \item \textbf{¿Qué técnica de distancia funciona mejor?} Se evaluó Manhattan vs Euclidiana. Manhattan fue elegida porque las dimensiones son independientes entre sí (no hay correlación esperada entre gas y flujo peatonal) y es más interpretable para el breakdown.
+    \item \textbf{¿Qué variables influyen más?} Depende del rubro. Para Gastronomía: trampa de grasas (25\%), flujo peatonal (25\%). Para Bodega: frente comercial (40\%), precio negociable (30\%). Esto valida el diseño de pesos por perfil.
+    \item \textbf{¿Cómo afecta la normalización?} Todas las features se normalizan a $[0,1]$ para que ninguna dimensión domine el score por diferencia de escala. Sin normalización, el precio (en millones) dominaría sobre features binarias.
+\end{itemize}
+
+\section{Comprensión de los Datos}
+Basado en el esquema de base de datos (\texttt{properties}, \texttt{users}) y las entradas del endpoint \texttt{POST /api/match}:
+\begin{itemize}
+    \item \textbf{Número de dimensiones:} 10 (7 técnicas + 3 de preferencias).
+    \item \textbf{Número de rubros:} 6 configurados (Gastronomía, Belleza/Estética, Retail, Servicios, Bodega/Logística, Otro).
+    \item \textbf{Datos faltantes:} Las preferencias de usuario son opcionales. Si no se proveen, el score de preferencias se neutraliza en 0.5 para no sesgar el resultado.
+    \item \textbf{Tipo predominante:} Features numéricas continuas en $[0,1]$, derivadas de datos mixtos (booleanos, ordinales, texto).
+\end{itemize}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.12\hsize}X >{\hsize=0.15\hsize}X >{\hsize=0.15\hsize}X >{\hsize=0.58\hsize}X}
+        \toprule
+        \textbf{\#} & \textbf{Dimensión} & \textbf{Tipo origen} & \textbf{Encoding} \\
+        \midrule
+        0 & Capacidad Eléctrica & Booleano & Básica = 0.0, Trifásica = 1.0 \\
+        1 & Conexión de Gas & Booleano & No = 0.0, Sí = 1.0 \\
+        2 & Conexión de Agua & Booleano & No = 0.0, Sí = 1.0 \\
+        3 & Trampa de Grasa & Booleano & No = 0.0, Sí = 1.0 \\
+        4 & Frente Comercial & Numérico (m) & $\min(\text{metros}/20,\; 1.0)$ \\
+        5 & Flujo Peatonal & Ordinal & Bajo = 0.33, Medio = 0.66, Alto = 1.0 \\
+        6 & Precio Negociable & Booleano & No = 0.0, Sí = 1.0 \\
+        7 & Ajuste Presupuesto & Función & $f(\text{ratio precio/budget})$, 4 niveles \\
+        8 & Ajuste Tamaño & Función & $f(\text{m² vs rango [min, max]})$, 3 niveles \\
+        9 & Match Ubicación & Similitud texto & Fuzzy match de strings \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Estado Actual del Motor (Julio 2026)}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.3\hsize}X >{\hsize=0.7\hsize}X}
+        \toprule
+        \textbf{Componente} & \textbf{Estado} \\
+        \midrule
+        Extracción de features técnicas & Implementado. 7 dimensiones desde \texttt{model.Property}. \\
+        Extracción de features de usuario & Implementado. 3 dimensiones con neutralidad en 0.5 si no se proveen. \\
+        Perfiles de rubro & Implementado. 6 perfiles con vectores de ideales y pesos en \texttt{profiles.go}. \\
+        Motor de scoring & Implementado. Weighted Manhattan Distance + blending spec/user. \\
+        Hard rule 29\% & Implementado. Cap si rubro $\notin$ \texttt{permitted\_uses}. \\
+        Explainability & Implementado. Breakdown de 10 dimensiones con ideal vs actual. \\
+        Persistencia de matches & \textbf{Pendiente}. Tabla \texttt{matches} creada pero no escrita. \\
+        Tests unitarios & \textbf{Pendiente}. Cero tests en el paquete \texttt{matcher/}. \\
+        Migración a ML & \textbf{Pendiente}. Arquitectura lista, falta recolección de labels. \\
+        Perfiles en base de datos & \textbf{Pendiente}. Hardcodeados, no administrables sin redeploy. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Plan de Escalamiento}
+\begin{itemize}
+    \item \textbf{Fase 1 — Perfiles en DB:} Migrar los 6 perfiles de \texttt{profiles.go} a una tabla \texttt{rubro\_profiles} con columnas \texttt{rubro}, \texttt{dimension}, \texttt{ideal\_value}, \texttt{weight}, \texttt{user\_pref\_weight}. Crear endpoint \texttt{GET/PUT /api/admin/profiles} para administración sin redeploy.
+    \item \textbf{Fase 2 — Recolección de labels:} Almacenar cada match calculado en la tabla \texttt{matches} con \texttt{status} (\texttt{scored}, \texttt{contacted}, \texttt{closed\_won}, \texttt{closed\_lost}). Requiere $\geq 500$ matches etiquetados para entrenamiento supervisado.
+    \item \textbf{Fase 3 — Modelo supervisado:} Entrenar XGBoost con los mismos 10 features vectorizados + interacciones rubro $\times$ feature + precio/m² vs mediana zonal. El modelo reemplaza \texttt{weightedDistance()} manteniendo interfaz \texttt{EngineResult}.
+    \item \textbf{Fase 4 — Sistema híbrido:} Reglas como fallback, ML como scorer primario cuando confianza $> 0.7$. A/B testing entre motor de reglas y motor ML.
+\end{itemize}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.15\hsize}X >{\hsize=0.25\hsize}X >{\hsize=0.6\hsize}X}
+        \toprule
+        \textbf{Fase} & \textbf{Complejidad} & \textbf{Objetivo} \\
+        \midrule
+        Perfiles en DB & Media & Permitir tunear pesos e ideales sin redeploy. Habilitar A/B testing de configuraciones. \\
+        Labels & Media & Registrar outcomes reales de matches para entrenar modelo supervisado. \\
+        XGBoost & Alta & Reemplazar reglas con modelo entrenado sobre datos reales de contratos. \\
+        Híbrido & Alta & Combinar reglas (explicabilidad) con ML (precisión) según confianza. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Plan de Perfiles (Configuración Actual y Futura)}
+
+\subsection{Perfiles Actuales (hardcodeados en \texttt{profiles.go})}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.22\hsize}X >{\hsize=0.13\hsize}X >{\hsize=0.13\hsize}X >{\hsize=0.13\hsize}X >{\hsize=0.13\hsize}X >{\hsize=0.13\hsize}X >{\hsize=0.13\hsize}X}
+        \toprule
+        \textbf{Rubro} & \textbf{Potencia} & \textbf{Gas} & \textbf{Agua} & \textbf{Trampa} & \textbf{Frente} & \textbf{Tráfico} \\
+        \midrule
+        Gastronomía & 0.80 (10\%) & 1.00 (15\%) & 1.00 (10\%) & 1.00 (25\%) & 0.25 (5\%) & 0.80 (25\%) \\
+        Belleza & 0.50 (10\%) & 0.30 (5\%) & 0.80 (25\%) & 0.00 (5\%) & 0.30 (15\%) & 0.80 (30\%) \\
+        Retail & 0.50 (5\%) & 0.00 (0\%) & 0.30 (5\%) & 0.00 (0\%) & 0.50 (30\%) & 0.80 (30\%) \\
+        Servicios & 0.60 (20\%) & 0.30 (5\%) & 0.60 (15\%) & 0.20 (5\%) & 0.20 (10\%) & 0.50 (20\%) \\
+        Bodega & 0.50 (10\%) & 0.00 (0\%) & 0.30 (5\%) & 0.00 (0\%) & 0.60 (40\%) & 0.20 (15\%) \\
+        Otro & 0.50 (15\%) & 0.50 (15\%) & 0.50 (15\%) & 0.30 (10\%) & 0.30 (10\%) & 0.50 (20\%) \\
+        \bottomrule
+    \end{tabularx}
+    \caption{Vector ideal y peso (entre paréntesis) por dimensión técnica y rubro. Negociable completa las 7 dimensiones (no mostrado por espacio).}
+\end{table}
+
+\subsection{Migración a Base de Datos}
+
+\texttt{CREATE TABLE rubro\_profiles ( rubro VARCHAR(50), dimension VARCHAR(30), ideal\_value NUMERIC(3,2), weight NUMERIC(3,2), user\_pref\_weight NUMERIC(3,2), PRIMARY KEY (rubro, dimension) );}
+
+\begin{itemize}
+    \item \textbf{Ventaja:} Administración vía API sin redeploy. A/B testing de configuraciones de pesos.
+    \item \textbf{Desventaja:} Latencia adicional de 1 query por request de match. Mitigable con caché en memoria (carga al inicio, invalida al modificar).
+\end{itemize}
+
+\section{Plan de Scoring}
+\begin{itemize}
+    \item \textbf{Algoritmo principal: Weighted Manhattan Distance}
+    \begin{itemize}
+        \item \textbf{Fórmula specScore:} $\text{specScore} = \frac{\sum w_i \cdot (1 - |\text{actual}_i - \text{ideal}_i|)}{\sum w_i}$
+        \item \textbf{Fórmula userScore:} $\text{userScore} = \frac{\sum uw_j \cdot (1 - |\text{userActual}_j - 1.0|)}{\sum uw_j}$
+        \item \textbf{Fórmula finalScore:} $\text{finalScore} = \text{specScore} \cdot (1 - \alpha) + \text{userScore} \cdot \alpha$
+        \item \textbf{Objetivo:} Maximizar interpretabilidad. Cada dimensión contribuye de forma independiente y trazable al score final.
+    \end{itemize}
+    \item \textbf{Regla dura: Cap de usos permitidos}
+    \begin{itemize}
+        \item \textbf{Condición:} Si rubro $\notin$ \texttt{property.permitted\_uses} $\implies$ $\text{finalScore} = \min(\text{finalScore}, 0.29)$.
+        \item \textbf{Objetivo:} Evitar recomendar inmuebles donde el rubro no está legalmente permitido. El 29\% es deliberadamente inferior al umbral psicológico de ``30\% = malo'' pero mantiene visibilidad.
+    \end{itemize}
+\end{itemize}
+
+\section{Plan de Hiperparámetros}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.25\hsize}X >{\hsize=0.5\hsize}X}
+        \toprule
+        \textbf{Hiperparámetro} & \textbf{Valor actual} & \textbf{Estrategia de ajuste} \\
+        \midrule
+        Pesos por dimensión (specs) & Definidos por rubro en \texttt{profiles.go} & Ajuste manual por expertos de dominio. Futuro: optimización con grid search sobre datos etiquetados. \\
+        Pesos de preferencias (user) & [0.4, 0.3, 0.3] para budget, size, location & Igual para todos los rubros. Podría ser específico por rubro en el futuro. \\
+        UserPrefWeight ($\alpha$) & 0.25--0.35 según rubro & Controla el balance specs vs preferencias. Valores más altos dan más peso a lo que el usuario quiere vs lo que el rubro necesita. \\
+        Cap de no permitidos & 0.29 & Constante. Podría ser configurable por rubro (ej. 0.15 para Gastronomía que es más restrictivo). \\
+        Neutralidad & 0.5 & Valor asignado cuando el usuario no provee preferencias. Centrado para no sesgar. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Plan Experimental}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{l l l X X}
+        \toprule
+        \textbf{Exp.} & \textbf{Rubro} & \textbf{Escenario} & \textbf{Especificaciones del inmueble} & \textbf{Score esperado} \\
+        \midrule
+        E1 & Gastronomía & Local ideal & Gas=Sí, Agua=Sí, Trampa=Sí, Trifásica, Alto tráfico, Frente=15m, Negotiable=Sí & $> 0.85$ \\
+        \addlinespace
+        E2 & Gastronomía & Sin gas ni trampa & Gas=No, Trampa=No, resto igual a E1 & $0.40 - 0.55$ \\
+        \addlinespace
+        E3 & Gastronomía & Bodega (no permitido) & Mismo inmueble de E1 pero \texttt{permitted\_uses = [Bodega]} & $\leq 0.29$ \\
+        \addlinespace
+        E4 & Bodega & Local con gran frente & Frente=20m, Negotiable=Sí, Trifásica, resto mínimo & $> 0.80$ \\
+        \addlinespace
+        E5 & Retail & Sin preferencias & specs variadas, sin userPreferences & userScore $\approx 0.5$ \\
+        \addlinespace
+        E6 & Belleza & Budget exacto & price $\leq$ maxBudget & Budget fit = 1.0 \\
+        \addlinespace
+        E7 & Cualquiera & Precio $> 1.5\times$ budget & price = 2M, maxBudget = 1M & Budget fit = 0.1 \\
+        \addlinespace
+        E8 & Cualquiera & Ubicación exacta & preferredLocation = ubicación real del inmueble & Location match = 1.0 \\
+        \bottomrule
+    \end{tabularx}
+    \caption{Escenarios de validación manual para el motor de matchmaking.}
+\end{table}
+
+\section{Plan de Evaluación}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.2\hsize}X >{\hsize=0.5\hsize}X >{\hsize=0.3\hsize}X}
+        \toprule
+        \textbf{Métrica} & \textbf{Qué evalúa} & \textbf{Resultado esperado} \\
+        \midrule
+        Precisión del score & Correspondencia entre puntaje numérico y percepción subjetiva del usuario/experto sobre la compatibilidad real. & Scores $>0.80$ deben corresponder a matches que expertos consideren ``altamente compatibles''. Scores $<0.30$ deben ser matches inviables. \\
+        Cobertura de cap & El 29\% de cap debe activarse \textbf{solo} cuando el rubro no está en \texttt{permitted\_uses}. Ni antes ni después. & 100\% de precisión en la activación del cap. Sin falsos positivos ni falsos negativos. \\
+        Neutralidad & Cuando no hay preferencias de usuario, el userScore no debe sesgar el resultado final. & userScore = 0.5 exactamente cuando los 3 campos de preferencias están ausentes. \\
+        Consistencia inter-rubro & Un mismo inmueble debe tener scores distintos para distintos rubros, reflejando la especialización. & La varianza de scores entre rubros para un mismo inmueble debe ser $> 0.15$. \\
+        Determinismo & Mismos inputs $\implies$ mismo score siempre. & 100\% determinístico. Sin aleatoriedad. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Estas métricas fueron seleccionadas para evaluar la calidad del motor desde perspectivas de \textbf{precisión}, \textbf{robustez} y \textbf{consistencia}. Al ser un sistema determinístico basado en reglas, no se evalúa con métricas de clustering (silhouette, Davies-Bouldin) sino con métricas de sistema de recomendación: precisión del ranking, cobertura de reglas de negocio, y neutralidad ante datos faltantes.
+
+\section{Evaluación Comparativa de Enfoques}
+Se contrastó Weighted Feature Distance contra tres enfoques alternativos durante la fase de diseño:
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.2\hsize}X >{\hsize=0.25\hsize}X >{\hsize=0.25\hsize}X >{\hsize=0.3\hsize}X}
+        \toprule
+        \textbf{Enfoque} & \textbf{Ventajas} & \textbf{Desventajas} & \textbf{Veredicto} \\
+        \midrule
+        Reglas if/else & Máxima explicabilidad. Sin dependencias matemáticas. & No escala: cada rubro nuevo requiere código nuevo. Imposible migrar a ML. Pesos implícitos e inajustables. & Descartado. Era el enfoque inicial del prototipo monolítico. \\
+        Cosine Similarity & Simplicidad matemática. Bueno para texto. & No soporta pesos por dimensión. No diferencia specs de preferencias. La normalización implícita oscurece el breakdown. & Descartado. No cumple el requisito de explicabilidad por dimensión con pesos. \\
+        \textbf{WFD (elegido)} & Pesos explícitos por rubro. Breakdown trazable. Arquitectura compatible con ML. Manhattan es interpretable. & Requiere definir perfiles manualmente. Los pesos iniciales dependen de criterio experto. & \textbf{Seleccionado.} Mejor balance explicabilidad/escalabilidad. \\
+        XGBoost / NN & Máxima precisión potencial. Aprende interacciones no lineales. & Requiere $\geq 500$ datos etiquetados. Caja negra: pierde explicabilidad. Overfitting con pocos datos. & Reservado para Fase 4. No viable sin datos históricos. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Arquitectura del Código}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.3\hsize}X >{\hsize=0.35\hsize}X >{\hsize=0.35\hsize}X}
+        \toprule
+        \textbf{Archivo} & \textbf{Responsabilidad} & \textbf{Dependencias} \\
+        \midrule
+        \texttt{matcher/profiles.go} & Define 6 rubros con vectores de ideales, pesos y $\alpha$. Único archivo a modificar para ajustar perfiles. & Ninguna (solo tipos internos). \\
+        \texttt{matcher/engine.go} & Implementa \texttt{weightedDistance()} y \texttt{Score()}. Produce \texttt{EngineResult} con breakdown. & \texttt{profiles.go} (lee perfiles). \\
+        \texttt{matcher/matcher.go} & API pública \texttt{Calculate()}. Extrae features de \texttt{model.Property} y \texttt{UserPreferences}. Orquesta el flujo. & \texttt{profiles.go}, \texttt{engine.go}. \\
+        \texttt{service/match.go} & Wrapper de servicio. \texttt{CalculateMatch()} y \texttt{GetMatchDetails()}. & \texttt{matcher/}, \texttt{repository/}. \\
+        \texttt{handler/assessment.go} & Handler HTTP. \texttt{CalculateMatchScore()} para \texttt{POST /api/match}. & \texttt{service/}, \texttt{model/}. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Plan de Visualización y Herramientas}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.35\hsize}X >{\hsize=0.65\hsize}X}
+        \toprule
+        \textbf{Visualización} & \textbf{Objetivo} \\
+        \midrule
+        Barras de progreso por dimensión & Frontend muestra \% de compatibilidad por cada dimensión técnica (ej. ``Capacidad Eléctrica: 85\%''). \\
+        Radar chart de specs & Comparar visualmente el perfil ideal del rubro vs el inmueble real en 7 ejes. \\
+        Badge de score global & Color-coded: verde ($>0.80$), amarillo ($0.50-0.80$), rojo ($<0.50$). Cap del 29\% siempre rojo. \\
+        Breakdown tabular & Tabla ordenada por contribución al score, mostrando ideal vs actual con indicador visual. \\
+        Comparación lado a lado & Dos inmuebles con sus radar charts superpuestos para decisión rápida. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{l X}
+        \toprule
+        \textbf{Elemento} & \textbf{Herramienta} \\
+        \midrule
+        Lenguaje del motor & Go 1.23 (stdlib \texttt{math}, sin dependencias externas). \\
+        Base de datos & PostgreSQL 16 + \texttt{lib/pq}. \\
+        Vectorización de features & Funciones puras en Go. Sin dependencias de ML. \\
+        API & \texttt{net/http} stdlib con path params de Go 1.22+. \\
+        Frontend (visualización) & React 19 + TypeScript 5.8 + Recharts + motion. \\
+        Testing & \texttt{go test} (unit), \texttt{httptest} (integration), Vitest (frontend). \\
+        CI/CD & Docker Compose + Jenkins. \\
+        Documentación & Markdown + \LaTeX. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Integración con Módulos del Sistema}
+
+\subsection{Módulos Actuales (Julio 2026)}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.15\hsize}X >{\hsize=0.6\hsize}X}
+        \toprule
+        \textbf{Endpoint} & \textbf{Método} & \textbf{Relación con Matchmaking} \\
+        \midrule
+        \texttt{/api/match} & POST & Punto principal de entrada. Calcula score + breakdown. \\
+        \texttt{/api/properties} & GET & Fuente de inmuebles a rankear. Soporta filtro \texttt{?rubro=}. \\
+        \texttt{/api/properties/\{id\}} & GET & Detalle de inmueble individual para el cálculo. \\
+        \texttt{/api/assessment} & POST & Captura rubro y preferencias del usuario para alimentar el match. \\
+        \texttt{/api/users/\{id\}} & GET & Perfil del usuario con documentos y nivel de confianza. \\
+        \texttt{/api/auth/*} & POST/GET & Autenticación JWT. Requerida para persistir matches por usuario. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{Módulos con IA — On Hold}
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.25\hsize}X >{\hsize=0.75\hsize}X}
+        \toprule
+        \textbf{Módulo} & \textbf{Estado} \\
+        \midrule
+        \texttt{POST /api/chat} & \textbf{[PLACEHOLDER — Pendiente decisión de cliente sobre proveedor LLM]} \\
+        & Chat conversacional con asistente estratégico. Actualmente implementado como proxy a Gemini 3 Flash Preview. Se requiere definir si se migra a DeepSeek V4 Pro, Claude, OpenAI, o se mantiene Gemini. El modelo final debe ser acordado con el cliente. \\
+        \addlinespace
+        \texttt{GET /api/trends} & \textbf{[PLACEHOLDER — Pendiente decisión de cliente sobre proveedor LLM y fuente de datos]} \\
+        & Dashboard de tendencias de mercado. Depende de LLM + Google Search grounding para datos actualizados. Existen alternativas sin IA (ver \texttt{docs/trends/ALTERNATIVAS\_SIN\_IA.md}). \\
+        \addlinespace
+        Visual Analyzer & \textbf{[PLACEHOLDER — Pendiente definición de alcance]} \\
+        & Análisis visual de fachadas. Requiere modelo multimodal con capacidades de visión. No implementado (solo placeholder en UI). \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\textbf{Nota sobre IA/LLM:} Todas las funcionalidades que dependen de modelos de lenguaje o APIs de inteligencia artificial están en estado \texttt{ON HOLD} hasta que el cliente defina el proveedor y modelo a utilizar. Las alternativas bajo evaluación incluyen: Gemini (Google), DeepSeek V4 Pro, Claude (Anthropic), GPT-4o (OpenAI), y alternativas sin IA para el módulo de trends (detalladas en \texttt{docs/trends/ALTERNATIVAS\_SIN\_IA.md}).
+
+\section{Path a Machine Learning}
+
+\subsection{Requisitos previos}
+\begin{itemize}
+    \item \textbf{Datos etiquetados:} $\geq 500$ matches con outcome conocido (\texttt{closed\_won} o \texttt{closed\_lost}).
+    \item \textbf{Features derivadas:} Interacciones rubro $\times$ feature, precio/m² vs mediana zonal, antigüedad del anuncio, tasa de contacto.
+    \item \textbf{Infraestructura:} Pipeline de entrenamiento offline (no en el servidor de producción). Exportación de features desde PostgreSQL.
+\end{itemize}
+
+\subsection{Estrategia de migración}
+\begin{enumerate}
+    \item \textbf{Shadow mode:} El modelo ML corre en paralelo al motor de reglas, registrando predicciones sin afectar al usuario. Se comparan scores durante 2--4 semanas.
+    \item \textbf{A/B test:} 10\% del tráfico recibe scores del modelo ML. Se mide tasa de conversión (contacto $\rightarrow$ visita $\rightarrow$ contrato).
+    \item \textbf{Cutover:} Si el modelo ML supera al motor de reglas en $>5\%$ de tasa de conversión con significancia estadística ($p < 0.05$), se promueve a primary scorer. Las reglas quedan como fallback.
+\end{enumerate}
+
+\section{Cronograma del Proyecto}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabularx}{\textwidth}{>{\hsize=0.15\hsize}X >{\hsize=0.25\hsize}X >{\hsize=0.6\hsize}X}
+        \toprule
+        \textbf{Semana} & \textbf{Fase} & \textbf{Entregables} \\
+        \midrule
+        Jul 1--7 & Scaffolding & Esquema DB, estructura de paquetes Go, Docker Compose, definición de tipos. \\
+        Jul 8--14 & Core CRUD + Motor WFD & Repositorios, handlers CRUD, 6 perfiles de rubro, engine.go, matcher.go. \\
+        Jul 15--21 & API Match + Auth + Upload & Endpoint /api/match, autenticación JWT, file upload, middleware CORS. \\
+        Jul 22--29 & Frontend + CI/CD & 8 páginas SPA, integración real con API, Jenkins pipeline, mobile responsive. \\
+        \addlinespace
+        Ago 1--7 (plan) & Perfiles en DB + Testing & Migrar perfiles a tabla \texttt{rubro\_profiles}, tests unitarios del matcher, tests de integración. \\
+        Ago 8--14 (plan) & RBAC + Validación + Paginación & Control de acceso por rol, validación de inputs, paginación en /api/properties. \\
+        Ago 15--21 (plan) & Persistencia + UI avanzada & Persistir matches, assessment y chat history. Radar charts, comparación lado a lado. \\
+        Ago 22--29 (plan) & MVP Launch & Deploy productivo, monitoreo, documentación final, handoff. \\
+        \addlinespace
+        Q4 2026 (tent.) & Recolección labels & Tabla matches con outcomes. $\geq 500$ registros etiquetados. \\
+        Q1 2027 (tent.) & ML Phase 1 & Entrenamiento XGBoost, shadow mode, A/B testing. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Referencias}
+\begin{itemize}
+    \item Ricci, F., Rokach, L., \& Shapira, B. (2011). \textit{Recommender Systems Handbook}. Springer. Capítulo 4: Content-Based Recommendation Systems.
+    \item Chen, T., \& Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. \textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}.
+    \item McInnes, L., Healy, J., \& Melville, J. (2018). UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. \textit{Journal of Open Source Software, 3}(29), 861.
+    \item Documentación interna del proyecto: \texttt{docs/matchmaking/ALGORITMO\_MATCHMAKING.md}, \texttt{docs/matchmaking/PLAN\_MATCHMAKING.md}.
+    \item Go 1.23 Standard Library: \texttt{net/http}, \texttt{math}, \texttt{crypto/rand}. \url{https://pkg.go.dev/std}
+\end{itemize}
+
+\end{document}

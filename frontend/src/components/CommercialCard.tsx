@@ -1,18 +1,31 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { MapPin, ChevronRight, Handshake } from 'lucide-react';
+import { MapPin, ChevronRight, Handshake, Lock } from 'lucide-react';
 import type { Property, BusinessRubro } from '@/types';
+import { UF_RATE } from '@/constants';
 
 interface Props {
   property: Property;
   matchScore?: number;
   userRubro: BusinessRubro;
+  isAuthenticated?: boolean;
   onClick: () => void;
 }
 
-export const CommercialCard: React.FC<Props> = ({ property, matchScore, userRubro, onClick }) => {
+function formatPrice(price: number, currency: string): { primary: string; secondary: string | null } {
+  if (currency === 'CLP') {
+    const ufValue = price / UF_RATE;
+    const primary = `${ufValue.toFixed(1)} UF`;
+    const secondary = `($${price.toLocaleString('es-CL')} CLP)`;
+    return { primary, secondary };
+  }
+  return { primary: `${currency} ${price.toLocaleString()}`, secondary: null };
+}
+
+export const CommercialCard: React.FC<Props> = ({ property, matchScore, userRubro, isAuthenticated = true, onClick }) => {
   const [imgSrc, setImgSrc] = useState(property.image);
   const showScore = typeof matchScore === 'number' && matchScore > 0;
+  const priceDisplay = formatPrice(property.price, property.currency);
 
   return (
     <motion.div
@@ -27,7 +40,7 @@ export const CommercialCard: React.FC<Props> = ({ property, matchScore, userRubr
           onError={() => setImgSrc(`https://placehold.co/800x600/FBB03B/1e293b?text=${encodeURIComponent(property.title.substring(0, 15))}`)}
           referrerPolicy="no-referrer"
         />
-        {showScore && (
+        {showScore && isAuthenticated && (
           <div className="absolute top-6 left-6 bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700/50">
             <div
               className={`w-2.5 h-2.5 rounded-full ${
@@ -38,6 +51,14 @@ export const CommercialCard: React.FC<Props> = ({ property, matchScore, userRubr
             />
             <span className="text-[11px] font-black text-white uppercase tracking-widest">
               {matchScore}% Match {userRubro}
+            </span>
+          </div>
+        )}
+        {!isAuthenticated && (
+          <div className="absolute top-6 left-6 bg-slate-900/90 backdrop-blur-xl px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700/50">
+            <Lock size={14} className="text-[#FBB03B]" />
+            <span className="text-[11px] font-black text-white uppercase tracking-widest">
+              Inicia sesión para ver compatibilidad
             </span>
           </div>
         )}
@@ -60,9 +81,14 @@ export const CommercialCard: React.FC<Props> = ({ property, matchScore, userRubr
           <div className="flex items-end justify-between px-2">
             <div>
               <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Canon Mensual</p>
-              <p className="text-3xl font-black text-slate-900">
-                {property.currency === 'CLP' ? '$' : property.currency} {property.price.toLocaleString()}
+              <p className="text-3xl font-black text-slate-900 leading-none">
+                {priceDisplay.primary}
               </p>
+              {priceDisplay.secondary && (
+                <p className="text-[10px] text-slate-400 font-medium mt-1">
+                  {priceDisplay.secondary}
+                </p>
+              )}
             </div>
             <div className="w-14 h-14 bg-slate-900 text-[#FBB03B] rounded-[1.25rem] flex items-center justify-center group-hover:bg-[#FBB03B] group-hover:text-slate-900 transition-all shadow-xl shadow-slate-200">
               <ChevronRight size={28} />

@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
+	"milocal/backend/internal/middleware"
 	"milocal/backend/internal/model"
 	"milocal/backend/internal/repository"
 	"milocal/backend/internal/service/matcher"
@@ -12,13 +14,13 @@ import (
 func CalculateMatchScore(w http.ResponseWriter, r *http.Request) {
 	var req model.MatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		sanitizedError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
 
 	property, err := repository.GetPropertyByID(req.PropertyID)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "Property not found", err.Error())
+		sanitizedError(w, http.StatusNotFound, "Property not found", err)
 		return
 	}
 
@@ -33,6 +35,14 @@ func CalculateMatchScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := matcher.Calculate(property, req.Rubro, prefs)
+
+	// Save match to DB
+	userID := middleware.GetUserIDFromContext(r.Context())
+	matchID := generateUUID()
+	matchScore := int(result.Score * 100)
+	if err := repository.SaveMatch(matchID, userID, req.PropertyID, req.Rubro, matchScore); err != nil {
+		log.Printf("Warning: failed to save match: %v", err)
+	}
 
 	response := model.MatchResponse{
 		Score:     result.Score,
@@ -60,17 +70,24 @@ func CalculateMatchScore(w http.ResponseWriter, r *http.Request) {
 func SubmitAssessment(w http.ResponseWriter, r *http.Request) {
 	var req model.AssessmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body", err.Error())
+		sanitizedError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
 
-	profile := map[string]interface{}{
-		"userType": req.UserType,
-		"step":     req.Step,
-		"data":     req.Data,
+	userID := middleware.GetUserIDFromContext(r.Context())
+	assessmentID := generateUUID()
+
+	if err := repository.SaveAssessment(assessmentID, userID, req.UserType, req.Step, req.Data, false); err != nil {
+		sanitizedError(w, http.StatusInternalServerError, "Error saving assessment", err)
+		return
 	}
 
-	writeJSON(w, http.StatusOK, model.AssessmentResponse{
-		Profile: profile,
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"id":        assessmentID,
+		"userId":    userID,
+		"userType":  req.UserType,
+		"step":      req.Step,
+		"data":      req.Data,
+		"completed": false,
 	})
 }

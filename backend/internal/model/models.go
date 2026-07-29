@@ -101,6 +101,7 @@ type Property struct {
 	Lng                  float64         `json:"lng"`
 	Image                string          `json:"image"`
 	Description          string          `json:"description"`
+	OwnerID              string          `json:"owner_id,omitempty"`
 	Specs                CommercialSpecs `json:"specs"`
 	NearbyPOIs           []string        `json:"nearbyPOIs"`
 	PastBusiness         string          `json:"pastBusiness"`
@@ -141,9 +142,11 @@ type TrendPoint struct {
 }
 
 type UserPreferences struct {
+	Rubro             string  `json:"rubro,omitempty"`
 	MaxBudget         float64 `json:"maxBudget"`
 	MinSize           float64 `json:"minSize"`
 	MaxSize           float64 `json:"maxSize"`
+	CommuneID         string  `json:"communeId,omitempty"`
 	PreferredLocation string  `json:"preferredLocation"`
 }
 
@@ -179,6 +182,14 @@ type AssessmentRequest struct {
 
 type AssessmentResponse struct {
 	Profile map[string]interface{} `json:"profile"`
+}
+
+type SaveAssessmentRequest struct {
+	UserID    string                 `json:"userId,omitempty"`
+	UserType  string                 `json:"userType"`
+	Step      int                    `json:"step"`
+	Data      map[string]interface{} `json:"data"`
+	Completed bool                   `json:"completed"`
 }
 
 type UpdateUserRequest struct {

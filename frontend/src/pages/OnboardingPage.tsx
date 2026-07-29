@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { CheckCircle, Briefcase, Target, Key, Building2, Flame, Store, Users, TrendingUp, Grid } from 'lucide-react';
+import { CheckCircle, Briefcase, Target, Key, Building2, Flame, Store, Users, TrendingUp, Grid, Loader2 } from 'lucide-react';
 import type { UserType, BusinessRubro, RubroOption } from '@/types';
+import { api } from '@/services/api';
+import { useToast } from '@/components/Toast';
 
 const RUBROS: RubroOption[] = [
   { label: 'Gastronomía', icon: <Flame />, color: '#FBB03B', description: 'Restaurantes, Cafés, Dark Kitchens' },
@@ -10,6 +12,58 @@ const RUBROS: RubroOption[] = [
   { label: 'Servicios', icon: <Briefcase />, color: '#FBB03B', description: 'Talleres, Consultorios, Agencias' },
   { label: 'Bodega / logística', icon: <TrendingUp />, color: '#FBB03B', description: 'Bodegas, Distribución, Last Mile' },
   { label: 'Otro', icon: <Grid />, color: '#FBB03B', description: 'Cualquier otro rubro comercial' },
+];
+
+const COMUNAS_RM: string[] = [
+  'Buin',
+  'Calera de Tango',
+  'Cerrillos',
+  'Cerro Navia',
+  'Colina',
+  'Conchalí',
+  'Curacaví',
+  'El Bosque',
+  'El Monte',
+  'Estación Central',
+  'Huechuraba',
+  'Independencia',
+  'Isla de Maipo',
+  'La Cisterna',
+  'La Florida',
+  'La Granja',
+  'La Pintana',
+  'La Reina',
+  'Lampa',
+  'Las Condes',
+  'Lo Barnechea',
+  'Lo Espejo',
+  'Lo Prado',
+  'Macul',
+  'Maipú',
+  'María Pinto',
+  'Melipilla',
+  'Ñuñoa',
+  'Padre Hurtado',
+  'Paine',
+  'Pedro Aguirre Cerda',
+  'Peñaflor',
+  'Peñalolén',
+  'Pirque',
+  'Providencia',
+  'Pudahuel',
+  'Puente Alto',
+  'Quilicura',
+  'Quinta Normal',
+  'Recoleta',
+  'Renca',
+  'San Bernardo',
+  'San Joaquín',
+  'San José de Maipo',
+  'San Miguel',
+  'San Ramón',
+  'Santiago',
+  'Talagante',
+  'Vitacura',
 ];
 
 interface Props {
@@ -21,9 +75,25 @@ export const OnboardingPage: React.FC<Props> = ({ onComplete }) => {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<Record<string, unknown>>({});
   const [showResult, setShowResult] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { addToast } = useToast();
 
-  const handleComplete = () => {
-    setShowResult(true);
+  const handleComplete = async () => {
+    setIsSubmitting(true);
+    try {
+      await api.submitAssessment({
+        userType: profile!,
+        step: getSteps().length,
+        data,
+      });
+      addToast('success', '¡Perfil guardado!');
+      setShowResult(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error al guardar el perfil';
+      addToast('error', msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDone = () => {
@@ -124,7 +194,7 @@ export const OnboardingPage: React.FC<Props> = ({ onComplete }) => {
     return '¿Tienes algún requerimiento técnico crítico?';
   };
 
-  const steps =
+  const getSteps = () =>
     profile === 'entrepreneur'
       ? [
           {
@@ -137,8 +207,8 @@ export const OnboardingPage: React.FC<Props> = ({ onComplete }) => {
           {
             title: 'Viabilidad',
             questions: [
-              { id: 'budgetRange', label: 'Presupuesto mensual aproximado', type: 'select', options: ['< $300k', '$300k – $700k', '$700k – $1.5M', '> $1.5M'] },
-              { id: 'location', label: 'Ubicación preferida (Comuna o zona)', type: 'text' },
+              { id: 'budgetRange', label: 'Presupuesto mensual aproximado', type: 'select', options: ['< 10 UF', '10 – 25 UF', '25 – 50 UF', '50 – 100 UF', '> 100 UF'] },
+              { id: 'location', label: 'Ubicación preferida (Comuna o zona)', type: 'select', options: COMUNAS_RM },
             ],
           },
           {
@@ -160,7 +230,7 @@ export const OnboardingPage: React.FC<Props> = ({ onComplete }) => {
             title: 'Tu Propiedad',
             questions: [
               { id: 'propertyType', label: 'Tipo de propiedad', type: 'select', options: ['Local comercial', 'Casa adaptable', 'Oficina', 'Terreno'] },
-              { id: 'location', label: 'Ubicación (Comuna)', type: 'text' },
+              { id: 'location', label: 'Ubicación (Comuna)', type: 'select', options: COMUNAS_RM },
             ],
           },
           {
@@ -180,6 +250,7 @@ export const OnboardingPage: React.FC<Props> = ({ onComplete }) => {
           },
         ];
 
+  const steps = getSteps();
   const currentStep = steps[step];
 
   return (
@@ -258,9 +329,17 @@ export const OnboardingPage: React.FC<Props> = ({ onComplete }) => {
               if (step < steps.length - 1) setStep((s) => s + 1);
               else handleComplete();
             }}
-            className="flex-[2] p-4 bg-[#FBB03B] border-2 border-slate-900 rounded-xl font-black shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(15,23,42,1)] active:translate-y-[0px] transition-all"
+            disabled={isSubmitting}
+            className="flex-[2] p-4 bg-[#FBB03B] border-2 border-slate-900 rounded-xl font-black shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(15,23,42,1)] active:translate-y-[0px] transition-all disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] flex items-center justify-center gap-2"
           >
-            {step === steps.length - 1 ? 'Finalizar Assessment' : 'Siguiente Paso'}
+            {isSubmitting ? (
+              <>
+                <Loader2 size={20} className="animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              step === steps.length - 1 ? 'Finalizar Assessment' : 'Siguiente Paso'
+            )}
           </button>
         </div>
       </motion.div>

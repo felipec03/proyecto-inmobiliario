@@ -13,7 +13,7 @@ type scanner interface {
 }
 
 func GetAllProperties(rubro string) ([]model.Property, error) {
-	query := `SELECT id, title, price, currency, sqm, location, lat, lng, image, description,
+	query := `SELECT id, title, price, currency, sqm, location, lat, lng, image, description, COALESCE(owner_id, ''),
 		has_gas, power_capacity, water_connection, grease_trap, frontage_size, foot_traffic,
 		permitted_uses, nearby_pois, past_business, renovation_needed, owner_notes, negotiable, neighborhood_insights
 		FROM properties`
@@ -44,7 +44,7 @@ func GetAllProperties(rubro string) ([]model.Property, error) {
 }
 
 func GetPropertyByID(id string) (*model.Property, error) {
-	row := DB.QueryRow(`SELECT id, title, price, currency, sqm, location, lat, lng, image, description,
+	row := DB.QueryRow(`SELECT id, title, price, currency, sqm, location, lat, lng, image, description, COALESCE(owner_id, ''),
 		has_gas, power_capacity, water_connection, grease_trap, frontage_size, foot_traffic,
 		permitted_uses, nearby_pois, past_business, renovation_needed, owner_notes, negotiable, neighborhood_insights
 		FROM properties WHERE id = $1`, id)
@@ -52,11 +52,11 @@ func GetPropertyByID(id string) (*model.Property, error) {
 }
 
 func CreateProperty(p *model.Property) error {
-	_, err := DB.Exec(`INSERT INTO properties (id, title, price, currency, sqm, location, lat, lng, image, description,
+	_, err := DB.Exec(`INSERT INTO properties (id, title, price, currency, sqm, location, lat, lng, image, description, owner_id,
 		has_gas, power_capacity, water_connection, grease_trap, frontage_size, foot_traffic,
 		permitted_uses, nearby_pois, past_business, renovation_needed, owner_notes, negotiable, neighborhood_insights)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
-		p.ID, p.Title, p.Price, p.Currency, p.Sqm, p.Location, p.Lat, p.Lng, p.Image, p.Description,
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+		p.ID, p.Title, p.Price, p.Currency, p.Sqm, p.Location, p.Lat, p.Lng, p.Image, p.Description, p.OwnerID,
 		p.Specs.HasGas, string(p.Specs.PowerCapacity), p.Specs.WaterConnection, p.Specs.GreaseTrap,
 		p.Specs.FrontageSize, string(p.Specs.FootTraffic),
 		pq.Array(p.Specs.PermittedUses), pq.Array(p.NearbyPOIs),
@@ -81,7 +81,7 @@ func scanProperty(s scanner) (*model.Property, error) {
 	var permittedUses, nearbyPOIs []string
 
 	if err := s.Scan(
-		&p.ID, &p.Title, &p.Price, &p.Currency, &p.Sqm, &p.Location, &lat, &lng, &p.Image, &p.Description,
+		&p.ID, &p.Title, &p.Price, &p.Currency, &p.Sqm, &p.Location, &lat, &lng, &p.Image, &p.Description, &p.OwnerID,
 		&hasGas, &powerCap, &waterConn, &greaseTrap, &p.Specs.FrontageSize, &footTraf,
 		pq.Array(&permittedUses), pq.Array(&nearbyPOIs), &p.PastBusiness, &p.RenovationNeeded,
 		&p.OwnerNotes, &negotiable, &p.NeighborhoodInsights,

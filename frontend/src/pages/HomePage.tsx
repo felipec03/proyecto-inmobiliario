@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import {
   Zap, ArrowRight, Target, Key, ChevronRight,
-  Grid, MapIcon, MapPin, Flame, Droplets, Store,
-  TrendingUp, Briefcase, Users, RefreshCw, PackageOpen,
+  Grid, MapPin, Flame, Store,
+  TrendingUp, Briefcase, Users, RefreshCw, PackageOpen, LogIn,
 } from 'lucide-react';
 import { CommercialCard } from '@/components/CommercialCard';
 import { PropertyCardSkeleton } from '@/components/Skeleton';
@@ -21,24 +21,49 @@ const RUBROS: RubroOption[] = [
 ];
 
 interface Props {
+  isAuthenticated?: boolean;
   onNavigate: (tab: string, params?: Record<string, string>) => void;
   onSelectProperty: (id: string) => void;
 }
 
-export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
-  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+export const HomePage: React.FC<Props> = ({ isAuthenticated = false, onNavigate, onSelectProperty }) => {
   const [selectedRubro, setSelectedRubro] = useState<BusinessRubro>('Gastronomía');
   const [properties, setProperties] = useState<Property[]>([]);
+  const [matchScores, setMatchScores] = useState<Map<string, number>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMatches, setIsLoadingMatches] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { addToast } = useToast();
 
   const fetchProperties = useCallback(async (rubro?: string) => {
     setIsLoading(true);
     setError(null);
+    setMatchScores(new Map());
     try {
       const data = await api.getProperties(rubro || undefined);
       setProperties(data);
+
+      // Fetch match scores for authenticated users
+      if (isAuthenticated && data.length > 0) {
+        setIsLoadingMatches(true);
+        const scores = new Map<string, number>();
+        try {
+          const results = await Promise.allSettled(
+            data.map((p) =>
+              api.calculateMatch(p.id, rubro || selectedRubro).then((m) => ({ id: p.id, score: Math.round(m.score * 100) }))
+            )
+          );
+          results.forEach((r) => {
+            if (r.status === 'fulfilled') {
+              scores.set(r.value.id, r.value.score);
+            }
+          });
+        } catch {
+          // Silently fail — cards will just not show match scores
+        }
+        setMatchScores(scores);
+        setIsLoadingMatches(false);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al cargar propiedades';
       setError(msg);
@@ -46,7 +71,7 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [addToast]);
+  }, [addToast, isAuthenticated, selectedRubro]);
 
   useEffect(() => {
     fetchProperties(selectedRubro);
@@ -77,13 +102,23 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
               Te ayudamos a no equivocarte con tu primer local y a dejar de perder plata con tu propiedad.
             </p>
             <div className="flex flex-wrap gap-6">
-              <button
-                onClick={() => onNavigate('onboarding')}
-                className="px-10 py-6 bg-[#FBB03B] text-slate-900 rounded-[2rem] font-black text-lg flex items-center gap-3 hover:scale-105 hover:rotate-1 transition-all shadow-[0_20px_50px_rgba(251,176,59,0.3)]"
-                aria-label="Empezar el assessment"
-              >
-                Empezar Assessment <ArrowRight size={24} />
-              </button>
+              {isAuthenticated ? (
+                <button
+                  onClick={() => onNavigate('onboarding')}
+                  className="px-10 py-6 bg-[#FBB03B] text-slate-900 rounded-[2rem] font-black text-lg flex items-center gap-3 hover:scale-105 hover:rotate-1 transition-all shadow-[0_20px_50px_rgba(251,176,59,0.3)]"
+                  aria-label="Empezar el assessment"
+                >
+                  Empezar Assessment <ArrowRight size={24} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => onNavigate('login')}
+                  className="px-10 py-6 bg-[#FBB03B] text-slate-900 rounded-[2rem] font-black text-lg flex items-center gap-3 hover:scale-105 hover:rotate-1 transition-all shadow-[0_20px_50px_rgba(251,176,59,0.3)]"
+                  aria-label="Iniciar sesión para empezar"
+                >
+                  <LogIn size={24} /> Inicia sesión para empezar
+                </button>
+              )}
               <div className="flex -space-x-4 items-center ml-4">
                 {[1, 2, 3, 4].map((i) => (
                   <img
@@ -113,7 +148,9 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
           <p className="text-slate-800 font-bold text-lg mb-8 leading-relaxed">
             Te ayudamos a no equivocarte con tu primer local. Análisis de flujo y normativa técnica en un solo lugar.
           </p>
-          <button onClick={() => onNavigate('onboarding')} className="flex items-center gap-2 font-black text-sm uppercase tracking-widest border-b-4 border-slate-900 pb-1">
+          <button onClick={() => {
+            if (isAuthenticated) { onNavigate('onboarding'); } else { onNavigate('login'); }
+          }} className="flex items-center gap-2 font-black text-sm uppercase tracking-widest border-b-4 border-slate-900 pb-1">
             Hacer Assessment Emprendedor <ChevronRight size={18} />
           </button>
         </div>
@@ -125,7 +162,9 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
           <p className="text-gray-500 font-bold text-lg mb-8 leading-relaxed">
             Te ayudamos a dejar de perder plata con tu propiedad. Conectamos tu espacio con el arrendatario ideal.
           </p>
-          <button onClick={() => onNavigate('onboarding')} className="flex items-center gap-2 font-black text-sm uppercase tracking-widest border-b-4 border-[#FBB03B] pb-1">
+          <button onClick={() => {
+            if (isAuthenticated) { onNavigate('onboarding'); } else { onNavigate('login'); }
+          }} className="flex items-center gap-2 font-black text-sm uppercase tracking-widest border-b-4 border-[#FBB03B] pb-1">
             Hacer Assessment Propietario <ChevronRight size={18} />
           </button>
         </div>
@@ -137,22 +176,6 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
           <div>
             <h3 className="text-5xl font-black tracking-tighter mb-4">Explora Oportunidades</h3>
             <p className="text-gray-500 text-xl font-medium">Locales validados técnicamente por MiLocal Shield.</p>
-          </div>
-          <div className="flex bg-white p-2 rounded-[2rem] border-2 border-slate-900 shadow-lg">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`px-8 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all ${viewMode === 'grid' ? 'bg-slate-900 text-white' : 'text-gray-400 hover:text-slate-900'}`}
-              aria-label="Vista en grilla"
-            >
-              <Grid size={16} /> Grilla
-            </button>
-            <button
-              onClick={() => setViewMode('map')}
-              className={`px-8 py-3 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all ${viewMode === 'map' ? 'bg-slate-900 text-white' : 'text-gray-400 hover:text-slate-900'}`}
-              aria-label="Vista en mapa"
-            >
-              <MapIcon size={16} /> Mapa
-            </button>
           </div>
         </div>
 
@@ -240,7 +263,9 @@ export const HomePage: React.FC<Props> = ({ onNavigate, onSelectProperty }) => {
               >
                 <CommercialCard
                   property={property}
+                  matchScore={matchScores.get(property.id)}
                   userRubro={selectedRubro}
+                  isAuthenticated={isAuthenticated}
                   onClick={() => onSelectProperty(property.id)}
                 />
               </motion.div>
