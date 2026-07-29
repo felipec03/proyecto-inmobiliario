@@ -1,0 +1,564 @@
+openapi: "3.0.3"
+info:
+  title: MiLocal — API de Matchmaking Inmobiliario Comercial
+  description: |
+    Plataforma que conecta emprendedores con propietarios de locales comerciales
+    mediante un motor de Weighted Feature Distance. Enfoque exclusivo en Chile.
+  version: "1.0.0"
+  contact:
+    name: MiLocal
+    url: https://matchinmobiliario.fcadev.cl
+
+servers:
+  - url: https://matchinmobiliario.fcadev.cl/api
+    description: Producción
+  - url: http://localhost:8080/api
+    description: Desarrollo local
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Sistema]
+      summary: Health check con verificación de base de datos
+      security: []
+      responses:
+        "200":
+          description: Servicio y DB operativos
+          content: { application/json: { schema: { $ref: "#/components/schemas/HealthOK" } } }
+        "503":
+          description: Servicio o DB no disponibles
+          content: { application/json: { schema: { $ref: "#/components/schemas/HealthError" } } }
+
+  /auth/register:
+    post:
+      tags: [Autenticación]
+      summary: Registrar nuevo usuario
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, type]
+              properties:
+                name:     { type: string, example: "Carlos Emprendedor" }
+                email:    { type: string, format: email, example: "carlos@startup.cl" }
+                password: { type: string, minLength: 6, example: "test123" }
+                type:     { type: string, enum: [entrepreneur, owner], example: "entrepreneur" }
+                rut:      { type: string, example: "12.345.678-9" }
+      responses:
+        "201":
+          description: Usuario creado exitosamente
+          content: { application/json: { schema: { $ref: "#/components/schemas/AuthResponse" } } }
+        "400":
+          description: Datos inválidos
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "409":
+          description: Email ya registrado
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /auth/login:
+    post:
+      tags: [Autenticación]
+      summary: Iniciar sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:    { type: string, format: email, example: "carlos@startup.cl" }
+                password: { type: string, example: "test123" }
+      responses:
+        "200":
+          description: Login exitoso
+          content: { application/json: { schema: { $ref: "#/components/schemas/AuthResponse" } } }
+        "401":
+          description: Credenciales inválidas
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+
+  /auth/me:
+    get:
+      tags: [Autenticación]
+      summary: Obtener perfil del usuario autenticado
+      responses:
+        "200":
+          description: Perfil del usuario
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserProfileResponse" } } }
+        "401":
+          description: Token inválido o expirado
+
+  /properties:
+    get:
+      tags: [Propiedades]
+      summary: Listar propiedades
+      security: []
+      parameters:
+        - name: rubro
+          in: query
+          schema: { type: string }
+          description: Filtrar por rubro (Gastronomía, Retail, etc.)
+      responses:
+        "200":
+          description: Lista de propiedades
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Property" } } } }
+    post:
+      tags: [Propiedades]
+      summary: Publicar nueva propiedad (solo propietarios)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, price, sqm, location]
+              properties:
+                title:      { type: string, example: "Local Comercial Providencia" }
+                price:      { type: number, example: 900000 }
+                currency:   { type: string, default: "CLP" }
+                sqm:        { type: integer, minimum: 1, example: 45 }
+                location:   { type: string, example: "Providencia, Santiago" }
+                description:{ type: string }
+                image:      { type: string, format: uri }
+                has_gas:            { type: boolean }
+                power_capacity:     { type: string, enum: [Básica, Trifásica] }
+                water_connection:   { type: boolean }
+                grease_trap:        { type: boolean }
+                frontage_size:      { type: integer }
+                foot_traffic:       { type: string, enum: [Bajo, Medio, Alto] }
+                permitted_uses:     { type: array, items: { type: string } }
+                negotiable:         { type: boolean }
+      responses:
+        "201":
+          description: Propiedad creada
+          content: { application/json: { schema: { $ref: "#/components/schemas/Property" } } }
+        "400":
+          description: Datos inválidos (campos requeridos faltantes)
+        "403":
+          description: No autorizado (solo propietarios pueden publicar)
+
+  /properties/{id}:
+    get:
+      tags: [Propiedades]
+      summary: Obtener propiedad por ID
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Propiedad encontrada
+          content: { application/json: { schema: { $ref: "#/components/schemas/Property" } } }
+        "404":
+          description: Propiedad no encontrada
+
+  /users/{id}:
+    get:
+      tags: [Usuarios]
+      summary: Obtener perfil de usuario (requiere autenticación)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Perfil del usuario con documentos
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserProfile" } } }
+        "401": { description: "No autenticado" }
+    put:
+      tags: [Usuarios]
+      summary: Actualizar perfil (solo el propio usuario)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:     { type: string }
+                email:    { type: string, format: email }
+                sub_type: { type: string, enum: [natural, juridica] }
+      responses:
+        "200": { description: "Perfil actualizado" }
+        "403": { description: "No tienes permiso para modificar este perfil" }
+
+  /users/{id}/preferences:
+    get:
+      tags: [Usuarios]
+      summary: Obtener preferencias del usuario (requiere autenticación)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Preferencias del usuario
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserPreferences" } } }
+    put:
+      tags: [Usuarios]
+      summary: Guardar preferencias del usuario (solo el propio usuario)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserPreferences"
+      responses:
+        "200": { description: "Preferencias guardadas" }
+        "403": { description: "No autorizado" }
+
+  /users/{userId}/documents/{docId}/verify:
+    post:
+      tags: [Documentos]
+      summary: Verificar documento (solo el propio usuario)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: docId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: "Documento verificado" }
+        "403": { description: "No autorizado" }
+
+  /upload/document/{userId}:
+    post:
+      tags: [Upload]
+      summary: Subir documento (solo el propio usuario)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Archivo (jpg, jpeg, png, pdf). Máx 10MB."
+                type:
+                  type: string
+                  enum: [identity, income, legal, property]
+                name:
+                  type: string
+                documentId:
+                  type: string
+                  description: "ID del documento a actualizar (opcional)"
+      responses:
+        "200": { description: "Archivo subido exitosamente" }
+        "400": { description: "Archivo inválido (tipo o tamaño)" }
+        "403": { description: "No autorizado" }
+
+  /upload/property-image/{propertyId}:
+    post:
+      tags: [Upload]
+      summary: Subir imagen de propiedad (solo el dueño)
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Imagen (jpg, jpeg, png). Máx 10MB."
+      responses:
+        "200": { description: "Imagen subida exitosamente" }
+        "403": { description: "No eres el dueño de esta propiedad" }
+
+  /match:
+    post:
+      tags: [Matchmaking]
+      summary: Calcular compatibilidad inmueble-rubro
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [propertyId, rubro]
+              properties:
+                propertyId: { type: string, example: "1" }
+                rubro: { type: string, example: "Gastronomía" }
+                userPreferences:
+                  type: object
+                  properties:
+                    maxBudget:         { type: number, example: 25 }
+                    minSize:           { type: integer, example: 30 }
+                    maxSize:           { type: integer, example: 80 }
+                    preferredLocation: { type: string, example: "Providencia" }
+      responses:
+        "200":
+          description: Resultado del match
+          content: { application/json: { schema: { $ref: "#/components/schemas/MatchResponse" } } }
+        "401": { description: "Requiere autenticación" }
+
+  /assessment:
+    post:
+      tags: [Assessment]
+      summary: Guardar evaluación de onboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userType, step]
+              properties:
+                userType: { type: string, enum: [entrepreneur, owner] }
+                step:     { type: integer }
+                data:     { type: object, description: "Datos del formulario de assessment" }
+      responses:
+        "200":
+          description: Assessment guardado
+          content: { application/json: { schema: { $ref: "#/components/schemas/Assessment" } } }
+        "401": { description: "Requiere autenticación" }
+
+  /properties/{propertyId}/contact:
+    post:
+      tags: [Contacto]
+      summary: Enviar solicitud de contacto al propietario
+      parameters:
+        - name: propertyId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, message]
+              properties:
+                type:    { type: string, enum: [visit, proposal] }
+                message: { type: string }
+      responses:
+        "200": { description: "Solicitud enviada exitosamente" }
+        "401": { description: "Requiere autenticación" }
+
+  /chat:
+    post:
+      tags: [IA — ON HOLD]
+      summary: "[PLACEHOLDER] Chat con asistente estratégico — pendiente decisión de proveedor LLM"
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt:  { type: string }
+                history: { type: array, items: { type: object } }
+                rubro:   { type: string }
+      responses:
+        "200": { description: "Respuesta del asistente" }
+        "503": { description: "Servicio no disponible" }
+
+  /trends:
+    get:
+      tags: [IA — ON HOLD]
+      summary: "[PLACEHOLDER] Tendencias de mercado — pendiente decisión de fuente de datos"
+      security: []
+      parameters:
+        - name: city
+          in: query
+          schema: { type: string, default: "Santiago" }
+      responses:
+        "200":
+          description: Tendencias de mercado
+          content: { application/json: { schema: { $ref: "#/components/schemas/MarketTrend" } } }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenido en /auth/login o /auth/register
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: "Invalid credentials" }
+
+    HealthOK:
+      type: object
+      properties:
+        status: { type: string, example: "ok" }
+
+    HealthError:
+      type: object
+      properties:
+        status: { type: string, example: "unhealthy" }
+
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user:
+          type: object
+          properties:
+            id:       { type: string }
+            name:     { type: string }
+            email:    { type: string }
+            type:     { type: string }
+            level:    { type: integer }
+            subType:  { type: string }
+
+    UserProfileResponse:
+      type: object
+      properties:
+        id:       { type: string }
+        name:     { type: string }
+        email:    { type: string }
+        type:     { type: string }
+        level:    { type: integer }
+        subType:  { type: string }
+
+    UserProfile:
+      type: object
+      properties:
+        id:        { type: string }
+        name:      { type: string }
+        email:     { type: string }
+        type:      { type: string }
+        level:     { type: integer }
+        subType:   { type: string }
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              id:        { type: string }
+              name:      { type: string }
+              type:      { type: string }
+              status:    { type: string }
+              file_path: { type: string }
+
+    UserPreferences:
+      type: object
+      properties:
+        rubro:             { type: string }
+        maxBudget:         { type: number }
+        minSize:           { type: integer }
+        maxSize:           { type: integer }
+        commune_id:        { type: string }
+        preferredLocation: { type: string }
+
+    Property:
+      type: object
+      properties:
+        id:             { type: string }
+        title:          { type: string }
+        price:          { type: number }
+        currency:       { type: string }
+        sqm:            { type: integer }
+        location:       { type: string }
+        lat:            { type: number }
+        lng:            { type: number }
+        image:          { type: string }
+        description:    { type: string }
+        owner_id:       { type: string }
+        has_gas:        { type: boolean }
+        power_capacity: { type: string }
+        water_connection: { type: boolean }
+        grease_trap:    { type: boolean }
+        frontage_size:  { type: integer }
+        foot_traffic:   { type: string }
+        permitted_uses: { type: array, items: { type: string } }
+        negotiable:     { type: boolean }
+
+    MatchResponse:
+      type: object
+      properties:
+        score:     { type: number, description: "Score 0-1" }
+        permitted: { type: boolean, description: "Rubro en usos permitidos" }
+        specScore: { type: number }
+        userScore: { type: number }
+        breakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeatureContrib"
+
+    FeatureContrib:
+      type: object
+      properties:
+        dimension: { type: string }
+        label:     { type: string }
+        score:     { type: number }
+        weight:    { type: number }
+        maxWeight: { type: number }
+        ideal:     { type: number }
+        actual:    { type: number }
+
+    Assessment:
+      type: object
+      properties:
+        id:       { type: string }
+        userId:   { type: string }
+        userType: { type: string }
+        step:     { type: integer }
+        data:     { type: object }
+        completed:{ type: boolean }
+
+    MarketTrend:
+      type: object
+      properties:
+        city:        { type: string }
+        avgPriceSqm: { type: number }
+        demandLevel: { type: string }
+        summary:     { type: string }
+        trends:
+          type: array
+          items:
+            type: object
+            properties:
+              month:  { type: string }
+              growth: { type: number }
+
+tags:
+  - name: Sistema
+  - name: Autenticación
+  - name: Propiedades
+  - name: Usuarios
+  - name: Documentos
+  - name: Upload
+  - name: Matchmaking
+  - name: Assessment
+  - name: Contacto
+  - name: IA — ON HOLD
