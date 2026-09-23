@@ -94,7 +94,7 @@
 | Tests unitarios del motor de matchmaking | 3 | `matcher/*_test.go`: perfiles, edge cases, 29% cap |
 | Tests de integración: handlers con `httptest.NewServer` | 3 | Auth flow, CRUD, match |
 | Tests frontend: Vitest + React Testing Library | 3 | CommercialCard, LoginPage, OnboardingPage |
-| Documentación OpenAPI completa (18 endpoints) | 2 | `docs/api/openapi.yaml` — Swagger/Redoc |
+| Documentación OpenAPI completa (23 endpoints) | 2 | `docs/api/openapi.yaml` — Swagger/Redoc |
 | Project Charter en LaTeX compilando toda la documentación | 2 | `docs/charter/PROJECT_CHARTER.tex` |
 | Planificación Septiembre 2026 | 1 | `docs/planning/SEPTIEMBRE_2026.md` |
 | Deploy productivo final + smoke tests | 1 | Verify all endpoints, frontend, auth flow |
@@ -133,7 +133,7 @@
 | CORS válido | `*` + credentials eliminado | Inspección de headers |
 | API key expuesta | 0 keys en bundle frontend | `grep -r "GEMINI\|API_KEY" frontend/src/` |
 | Tests | ≥ 20 tests unitarios/integración | `go test ./...` + `npx vitest run` |
-| Documentación API | 18 endpoints documentados | OpenAPI spec completa |
+| Documentación API | 23 endpoints documentados | OpenAPI spec completa |
 | Flujo end-to-end | Registro → Onboarding → Propiedades → Match → Contacto | Smoke test manual |
 
 ---

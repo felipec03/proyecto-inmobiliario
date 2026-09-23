@@ -115,10 +115,14 @@ go run ./cmd/server
 PostgreSQL 16 con las siguientes tablas:
 
 - `users` - Perfiles de emprendedores y propietarios
-- `documents` - Documentos de verificación (identidad, carpeta tributaria, legal)
-- `properties` - Locales comerciales con especificaciones técnicas
-- `matches` - Historial de scores calculados
-- `chat_history` - Registro de conversaciones
+- `documents` - Documentos de verificación (identidad, ingresos, legal, propiedad)
+- `properties` - Locales comerciales con especificaciones técnicas y disponibilidad
+- `matches` - Historial de scores calculados con estado (`scored`/`contacted`/`closed_won`/`closed_lost`)
+- `assessments` - Respuestas del onboarding (JSONB)
+- `user_preferences` - Preferencias de búsqueda del usuario
+- `leads` - Guardados, postulaciones y solicitudes de contacto
+- `static_trends` - Datos de mercado curados para `GET /api/trends`
+- `chat_history` - Registro de conversaciones (placeholder, ON HOLD)
 
 Las migraciones se ejecutan automáticamente al iniciar el backend. El seed incluye 3
 propiedades demo (Santiago, CDMX y Medellín) y un usuario de prueba (`u1`).
@@ -145,8 +149,13 @@ El proyecto sigue marcos IT estándar:
 | [`PRODUCT_BACKLOG.md`](docs/scrum/PRODUCT_BACKLOG.md) | Scrum |
 | [`POLITICA_PRIVACIDAD.md`](docs/security/POLITICA_PRIVACIDAD.md) | Ley 19.628 (Chile) + ISO 27001 |
 | [`MATRIZ_RIESGOS.md`](docs/security/MATRIZ_RIESGOS.md) | ISO 27001 |
-| [`ALGORITMO_MATCHMAKING.md`](docs/ALGORITMO_MATCHMAKING.md) | Arquitectura del motor de scoring |
+| [`ALGORITMO_MATCHMAKING.md`](docs/matchmaking/ALGORITMO_MATCHMAKING.md) | Arquitectura del motor de scoring |
+| [`PLAN_MATCHMAKING.md`](docs/matchmaking/PLAN_MATCHMAKING.md) | Plan de evolución y path a ML |
 | [`FUERA_DE_ALCANCE_LLM.md`](docs/FUERA_DE_ALCANCE_LLM.md) | Funcionalidades LLM pausadas |
+| [`schema.dbml`](docs/database/schema.dbml) | Diagrama entidad-relación de la base de datos |
+| [`openapi.yaml`](docs/api/openapi.yaml) | Especificación OpenAPI 3.0 de la API |
+| [`PROJECT_CHARTER.tex`](docs/charter/PROJECT_CHARTER.tex) | Project Charter (LaTeX) |
+| [`AGOSTO_2026.md`](docs/planning/AGOSTO_2026.md) | Planificación del mes de agosto |
 
 ## Módulo de matchmaking
 

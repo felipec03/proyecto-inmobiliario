@@ -47,7 +47,7 @@ MiLocal resuelve el problema en **3 ejes**, cada uno mapeado a los documentos de
 | Correspondencia | Referencia |
 |-----------------|------------|
 | **User Story** | US.01 - Perfilamiento de Rubro |
-| **Motor actual** | [`ALGORITMO_MATCHMAKING.md`](ALGORITMO_MATCHMAKING.md) — Weighted Feature Distance con perfiles vectoriales por rubro |
+| **Motor actual** | [`ALGORITMO_MATCHMAKING.md`](matchmaking/ALGORITMO_MATCHMAKING.md) — Weighted Feature Distance con perfiles vectoriales por rubro |
 | **Métrica de éxito** | Precisión del Scoring > 90% (validada vs contratos reales) — [`RACI_METRICAS.md`](governance/RACI_METRICAS.md) |
 | **Riesgo asociado** | R.03 — Sesgo algorítmico / manipulación del motor de match — [`MATRIZ_RIESGOS.md`](security/MATRIZ_RIESGOS.md) |
 
@@ -61,7 +61,7 @@ tamaño y ubicación deseada. Las propiedades con el rubro no permitido se capan
 | Correspondencia | Referencia |
 |-----------------|------------|
 | **User Stories** | US.02 - Carga de Carpeta Tributaria, US.03 - Trust Score, US.04 - Validación KYC |
-| **Implementación actual** | Trust Level 0 → 1 mediante carga de 3 documentos (identidad, carpeta tributaria, escritura de constitución). Endpoint `POST /api/users/{id}/documents/{docId}/verify` |
+| **Implementación actual** | Trust Level 0 → 1 mediante verificación administrativa de 3 documentos obligatorios (identidad, ingresos, legal). Endpoint `POST /api/users/{id}/documents/{docId}/verify` (solo administrador) |
 | **Métrica de éxito** | 0 filtraciones de datos sensibles — [`RACI_METRICAS.md`](governance/RACI_METRICAS.md) |
 | **Riesgos asociados** | R.01 — Acceso no autorizado a datos financieros (Alto), R.02 — Suplantación de identidad (Medio) — [`MATRIZ_RIESGOS.md`](security/MATRIZ_RIESGOS.md) |
 | **Marco legal** | Ley 19.628 (Chile) — Protección de datos personales — [`POLITICA_PRIVACIDAD.md`](security/POLITICA_PRIVACIDAD.md) |
@@ -102,7 +102,7 @@ completitud de su perfil.
 Ver [`FUERA_DE_ALCANCE_LLM.md`](FUERA_DE_ALCANCE_LLM.md) para el detalle completo:
 
 - **Chatbot Consultor**: asesoría conversacional sobre zonas, flujos y ROI. Depende de LLM.
-- **Pulso Comercial**: datos actualizados de mercado (precio/m², vacancia). Actualmente usa datos demo estáticos.
+- **Pulso Comercial**: datos de mercado (precio/m², vacancia) resueltos en el MVP con datos estáticos curados en `static_trends`, sin LLM. Ver [`ALTERNATIVAS_SIN_IA.md`](trends/ALTERNATIVAS_SIN_IA.md).
 - **Visual Analyzer**: análisis multimodal de fotos de fachada. Requiere modelo con visión.
 - **Integración con buró de crédito** (US.03): el Trust Score actualmente es binario (documentos verificados = nivel 1). La integración con Dicom/Equifax para scoring ponderado es una fase posterior.
 
@@ -135,4 +135,4 @@ DEFINICION_PROBLEMA.md  (este archivo)
 
 ---
 
-_Última actualización: Julio 2026 — Alineado con Product Backlog v1.0 y motor de matchmaking Fase 1_
+_Última actualización: Septiembre 2026 — Alineado con el Product Backlog consolidado (`docs/scrum/PRODUCT_BACKLOG.md`) y el motor de matchmaking Fase 1_

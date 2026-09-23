@@ -226,7 +226,10 @@ paths:
   /users/{userId}/documents/{docId}/verify:
     post:
       tags: [Documentos]
-      summary: Verificar documento (solo el propio usuario)
+      summary: Verificar documento y actualizar Trust Level (solo administrador)
+      description: |
+        Revisión administrativa de un documento. Al verificar los 3 documentos
+        obligatorios (identity, income, legal) el usuario asciende a Trust Level 1.
       parameters:
         - name: userId
           in: path
@@ -390,8 +393,8 @@ paths:
 
   /trends:
     get:
-      tags: [IA — ON HOLD]
-      summary: "[PLACEHOLDER] Tendencias de mercado — pendiente decisión de fuente de datos"
+      tags: [Tendencias]
+      summary: Tendencias de mercado (datos estáticos curados, sin LLM)
       security: []
       parameters:
         - name: city
@@ -399,8 +402,58 @@ paths:
           schema: { type: string, default: "Santiago" }
       responses:
         "200":
-          description: Tendencias de mercado
+          description: Tendencias de mercado (leídas de static_trends)
           content: { application/json: { schema: { $ref: "#/components/schemas/MarketTrend" } } }
+        "404":
+          description: Sin datos para la ciudad solicitada
+
+  /admin/users:
+    get:
+      tags: [Administración]
+      summary: Listar usuarios (solo administrador)
+      responses:
+        "200":
+          description: Listado de usuarios
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/UserProfile" } } } }
+        "403": { description: "Requiere rol administrador" }
+
+  /admin/properties:
+    get:
+      tags: [Administración]
+      summary: Listar y auditar inmuebles (solo administrador)
+      responses:
+        "200":
+          description: Listado completo de inmuebles
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Property" } } } }
+        "403": { description: "Requiere rol administrador" }
+
+  /admin/leads:
+    get:
+      tags: [Administración]
+      summary: Listar interacciones y leads (solo administrador)
+      responses:
+        "200":
+          description: Listado de leads
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Lead" } } } }
+        "403": { description: "Requiere rol administrador" }
+
+  /admin/trends/{city}:
+    put:
+      tags: [Administración]
+      summary: Actualizar datos de mercado de una ciudad (solo administrador)
+      parameters:
+        - name: city
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MarketTrend" }
+      responses:
+        "200": { description: "Tendencias actualizadas" }
+        "403": { description: "Requiere rol administrador" }
 
 components:
   securitySchemes:
@@ -493,6 +546,7 @@ components:
         lng:            { type: number }
         image:          { type: string }
         description:    { type: string }
+        available:      { type: boolean, description: "Disponibilidad/vacancia del local" }
         owner_id:       { type: string }
         has_gas:        { type: boolean }
         power_capacity: { type: string }
@@ -536,6 +590,17 @@ components:
         data:     { type: object }
         completed:{ type: boolean }
 
+    Lead:
+      type: object
+      properties:
+        id:         { type: string }
+        userId:     { type: string }
+        propertyId: { type: string }
+        type:       { type: string, enum: [saved, application, contact_request] }
+        status:     { type: string, enum: [new, seen, in_progress, closed, discarded] }
+        message:    { type: string }
+        createdAt:  { type: string, format: date-time }
+
     MarketTrend:
       type: object
       properties:
@@ -561,4 +626,6 @@ tags:
   - name: Matchmaking
   - name: Assessment
   - name: Contacto
+  - name: Tendencias
+  - name: Administración
   - name: IA — ON HOLD

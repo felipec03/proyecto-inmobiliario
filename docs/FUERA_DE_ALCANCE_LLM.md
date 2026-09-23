@@ -10,7 +10,10 @@ definitivo a utilizar. Las alternativas en evaluación son:
 - **DeepSeek V4 Pro** — viable para texto, sin capacidades multimodales
 - **Claude** (Anthropic) — viable para texto + visión
 - **GPT-4o** (OpenAI) — viable para texto + visión
-- **Alternativa sin IA** — viable para el módulo de trends (ver `docs/trends/ALTERNATIVAS_SIN_IA.md`)
+- **Alternativa sin IA** — resuelta para el módulo de trends (ver `docs/trends/ALTERNATIVAS_SIN_IA.md`)
+
+> **Nota:** El módulo de tendencias (Pulso Comercial, sección 2) ya **no** está en pausa:
+> se resuelve con datos estáticos curados. El chatbot y el Visual Analyzer continúan ON HOLD.
 
 ---
 
@@ -49,10 +52,10 @@ las funcionalidades asistivas por IA. El chatbot se reactivará en una fase post
 
 | Campo | Valor |
 |-------|-------|
-| **Estado** | Fuera de alcance (datos demo estáticos en uso) |
-| **Modelo actual** | Gemini 3 Flash Preview |
-| **Endpoint** | `GET /api/trends?city={ciudad}` (backend) |
-| **Código implicado** | `frontend/src/pages/TrendsPage.tsx`, `backend/internal/handler/chat.go`, `backend/internal/service/gemini.go` |
+| **Estado** | Resuelto para el MVP con datos estáticos curados (sin LLM) |
+| **Modelo actual** | Ninguno (se elimina la dependencia de Gemini 3 Flash Preview) |
+| **Endpoint** | `GET /api/trends?city={ciudad}` (backend) lee de `static_trends` |
+| **Código implicado** | `frontend/src/pages/TrendsPage.tsx`, `backend/internal/handler/trends.go` (nuevo), `docs/trends/ALTERNATIVAS_SIN_IA.md` |
 
 ### Qué hace
 Genera un reporte estructurado (JSON) con tendencias de mercado inmobiliario comercial:
@@ -69,10 +72,12 @@ Genera un reporte estructurado (JSON) con tendencias de mercado inmobiliario com
 - `TrendsPage.tsx` actualmente usa datos demo hardcodeados (`DEMO_TREND`), no consume
   el endpoint real
 
-### Por qué está fuera de alcance
-La funcionalidad está implementada en el backend pero el frontend usa datos de demo.
-Se requiere decidir el proveedor LLM definitivo (Gemini vs DeepSeek vs otro) y resolver
-la dependencia de web search para datos actualizados antes de activarlo.
+### Cómo se resuelve para el MVP
+Siguiendo `docs/trends/ALTERNATIVAS_SIN_IA.md`, el módulo se desacopla del LLM mediante la
+tabla `static_trends` con datos curados de fuentes verificadas (Colliers, CBRE, JLL) para
+Santiago, Ciudad de México y Medellín. El frontend consume esos datos reales en lugar de
+`DEMO_TREND` y el equipo los actualiza vía `PUT /admin/trends/{city}`. Así el MVP no queda
+bloqueado por la decisión del proveedor LLM.
 
 ### Alternativa evaluada: DeepSeek V4 Pro
 - **Viable** para generación de JSON estructurado
@@ -115,7 +120,7 @@ No se migró al nuevo frontend ni al backend. La funcionalidad requiere un model
 | Funcionalidad | Backend | Frontend | ¿Migrable a DeepSeek? | Bloqueante |
 |---------------|---------|----------|----------------------|------------|
 | Chatbot | `POST /api/chat` | `ChatPage.tsx` | Sí (solo texto) | No |
-| Pulso Comercial | `GET /api/trends` | `TrendsPage.tsx` | Sí (sin web search) | Web search grounding |
+| Pulso Comercial (trends) | `GET /api/trends` → `static_trends` | `TrendsPage.tsx` | N/A — resuelto sin LLM | No (datos estáticos curados) |
 | Visual Analyzer | No migrado | Placeholder | **No** | Requiere visión multimodal |
 
 ---

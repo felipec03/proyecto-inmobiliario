@@ -12,7 +12,7 @@
 | **Backend** | `internal/handler/chat.go:36` → `service.GetCommercialMarketTrends()` |
 | **Dependencia** | Gemini 3 Flash Preview + Google Search grounding |
 | **Frontend** | `TrendsPage.tsx` — consume el endpoint, fallback a `DEFAULT_TREND` hardcodeado |
-| **Producto en pausa** | Sí (ver `docs/FUERA_DE_ALCANCE_LLM.md`) |
+| **Producto en pausa** | No — el MVP adopta la Fase 1 (datos estáticos curados). Ver `docs/FUERA_DE_ALCANCE_LLM.md` |
 
 ---
 

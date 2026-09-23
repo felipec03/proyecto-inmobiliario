@@ -119,8 +119,9 @@
     \item Perfil de usuario con preferencias guardadas
     \item Onboarding/assessment para capturar rubro y necesidades
     \item Búsqueda de inmuebles por rubro
-    \item Dashboard de tendencias de mercado (Chile)
+    \item Tendencias de mercado (Chile) con datos estáticos curados (sin LLM)
     \item Interfaz responsive (mobile + desktop)
+    \item Panel de backoffice (administración de usuarios, inmuebles, leads y verificación de documentos)
     \item Pipeline CI/CD con Jenkins
 \end{itemize}
 
@@ -166,12 +167,14 @@
 ┌──────────────────────┐
 │  PostgreSQL 16       │
 │                      │
-│  7 tablas:           │
+│  10 tablas:          │
 │  users, documents,   │
 │  properties, matches,│
+│  assessments, leads, │
+│  user_preferences,   │
 │  chat_history,       │
-│  assessments,        │
-│  user_preferences    │
+│  static_trends,      │
+│ static_trends_monthly│
 └──────────────────────┘
 \end{verbatim}
 
@@ -284,12 +287,14 @@ Donde $\alpha = \text{RubroProfile.UserPrefWeights} \in [0.25, 0.35]$ según el 
 \begin{verbatim}
 users ─── 1:N ─── documents
   │
-  ├── 1:1 ─── user_preferences  (rubro, maxBudget, minSize, maxSize, commune_id)
+  ├── 1:1 ─── user_preferences  (rubro, max_budget, min_size, max_size, commune_id)
   ├── 1:N ─── assessments       (userType, step, data JSONB, completed)
-  ├── 1:N ─── matches           (property_id, rubro, score)
+  ├── 1:N ─── matches           (property_id, rubro, score, status)
+  ├── 1:N ─── leads             (property_id, type, status, message)
   ├── 1:N ─── chat_history      (role, content)
 
 properties ── N:1 ── users (owner_id)
+static_trends ── 1:N ── static_trends_monthly (city)
 \end{verbatim}
 
 \subsection{Tablas}
@@ -302,11 +307,13 @@ properties ── N:1 ── users (owner_id)
         \textbf{Tabla} & \textbf{Registros} & \textbf{Descripción} \\
         \midrule
         users & 2 (seed) + N & Emprendedores y propietarios. Password con bcrypt. \\
-        documents & 3 por usuario & Documentos de verificación (identidad, ingresos, legales, propiedad). \\
-        properties & 6 (seed) & Inmuebles comerciales con 24 columnas de especificaciones técnicas. \\
+        documents & 3 obligatorios + 1 opcional & Documentos de verificación (identidad, ingresos, legal; propiedad opcional). \\
+        properties & 6 (seed) & Inmuebles comerciales con 27 columnas (7 especificaciones técnicas + disponibilidad). \\
         matches & N & Historial de puntajes calculados. \\
         assessments & N & Respuestas del wizard de onboarding (JSONB). \\
         user\_preferences & 1 por usuario & Preferencias guardadas: rubro, presupuesto, tamaño, comuna. \\
+        leads & N & Guardados, postulaciones y solicitudes de contacto. \\
+        static\_trends & 3 (seed) & Datos de mercado curados por ciudad (sin LLM). \\
         chat\_history & N & Historial de conversaciones con el asistente (placeholder). \\
         \bottomrule
     \end{tabularx}
@@ -334,7 +341,7 @@ properties ── N:1 ── users (owner_id)
         7 & /properties & POST & JWT & Publicar inmueble (solo owner) \\
         8 & /users/\{id\} & GET & JWT & Perfil de usuario + documentos \\
         9 & /users/\{id\} & PUT & JWT & Actualizar perfil (solo propio) \\
-        10 & /users/\{id\}/documents/\{did\}/verify & POST & JWT & Verificar documento (solo propio) \\
+        10 & /users/\{id\}/documents/\{did\}/verify & POST & JWT (admin) & Verificar documento (Trust Level) \\
         11 & /users/\{id\}/preferences & GET & JWT & Obtener preferencias \\
         12 & /users/\{id\}/preferences & PUT & JWT & Guardar preferencias (solo propio) \\
         13 & /upload/document/\{id\} & POST & JWT & Subir documento (solo propio) \\
@@ -343,12 +350,16 @@ properties ── N:1 ── users (owner_id)
         16 & /assessment & POST & JWT & Guardar evaluación de onboarding \\
         17 & /properties/\{id\}/contact & POST & JWT & Solicitar visita/propuesta \\
         18 & /chat & POST & No & {[}PLACEHOLDER{]} Asistente IA \\
-        19 & /trends & GET & No & {[}PLACEHOLDER{]} Tendencias \\
+        19 & /trends & GET & No & Tendencias (datos estáticos curados) \\
+        20 & /admin/users & GET & JWT (admin) & Listar y auditar usuarios \\
+        21 & /admin/properties & GET & JWT (admin) & Listar y auditar inmuebles \\
+        22 & /admin/leads & GET & JWT (admin) & Listar interacciones y leads \\
+        23 & /admin/trends/\{city\} & PUT & JWT (admin) & Actualizar datos de mercado \\
         \bottomrule
     \end{tabularx}
 \end{table}
 
-\textbf{Especificación completa:} \texttt{docs/api/openapi.yaml} (OpenAPI 3.0.3, 19 endpoints).
+\textbf{Especificación completa:} \texttt{docs/api/openapi.yaml} (OpenAPI 3.0.3, 23 endpoints).
 
 % ===================================================================
 \section{Seguridad}
@@ -456,8 +467,10 @@ Servicios:
         Catálogo de Servicios SLA (ITIL 4) & \texttt{docs/ops/CATALOGO\_SERVICIOS\_SLA.md} \\
         RACI y Métricas (COBIT) & \texttt{docs/governance/RACI\_METRICAS.md} \\
         Planificación Agosto 2026 & \texttt{docs/planning/AGOSTO\_2026.md} \\
-        Month Review Julio 2026 & \texttt{month-review.md} \\
-        To-Do (auditoría MVP) & \texttt{to-do.md} \\
+        Avance y Plan Agosto 2026 & \texttt{docs/planning/AVANCE\_Y\_PLAN\_AGOSTO.md} \\
+        Month Review Julio 2026 & \texttt{docs/planning/JULIO\_2026.md} \\
+        Auditoría MVP (to-do) & \texttt{docs/planning/AUDITORIA\_MVP.md} \\
+        Esquema de Base de Datos (DBML) & \texttt{docs/database/schema.dbml} \\
         \textbf{Project Charter (este documento)} & \texttt{docs/charter/PROJECT\_CHARTER.tex} \\
         \bottomrule
     \end{tabularx}

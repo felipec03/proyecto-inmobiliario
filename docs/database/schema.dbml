@@ -1,0 +1,271 @@
+// MiLocal — Trust & Match
+// Diagrama de base de datos (DBML)
+// Generado: Julio 2026
+
+// ─── ENUMS ────────────────────────────────────────────────────────
+
+Enum user_type {
+  entrepreneur
+  owner
+}
+
+Enum user_level {
+  no_verificado [note: "Valor DB: 0 — Sin documentos verificados"]
+  verificado [note: "Valor DB: 1 — Documentos verificados (Trust Level 1)"]
+}
+
+Enum sub_type {
+  natural
+  juridica
+}
+
+Enum doc_type {
+  identity [note: "Cédula de identidad / Pasaporte"]
+  income [note: "Declaración de renta / Boletas de honorarios"]
+  legal [note: "Escritura de constitución / Certificado de vigencia"]
+  property [note: "Certificado de dominio vigente / Escritura"]
+}
+
+Enum doc_status {
+  empty
+  pending
+  verified
+}
+
+Enum power_capacity {
+  Básica
+  Trifásica
+}
+
+Enum foot_traffic {
+  Bajo
+  Medio
+  Alto
+}
+
+Enum chat_role {
+  user
+  model
+}
+
+Enum match_status {
+  scored [note: "Match calculado y registrado"]
+  contacted [note: "El usuario solicitó contacto / postuló"]
+  closed_won [note: "Derivó en contrato firmado (label positivo)"]
+  closed_lost [note: "Descartado explícitamente (label negativo)"]
+}
+
+Enum lead_type {
+  saved [note: "Inmueble guardado / favorito"]
+  application [note: "Postulación a un inmueble"]
+  contact_request [note: "Solicitud de contacto / visita / propuesta"]
+}
+
+Enum lead_status {
+  new
+  seen
+  in_progress
+  closed
+  discarded
+}
+
+// ─── TABLAS ───────────────────────────────────────────────────────
+
+Table users {
+  id varchar(36) [pk, note: "UUID v4"]
+  name varchar(255) [not null]
+  email varchar(255) [not null, unique]
+  type user_type [not null]
+  level int [default: 0, note: "0 = no_verificado, 1 = verificado. CHECK (level IN (0,1))"]
+  sub_type sub_type [default: "natural"]
+  password_hash text [not null, default: "", note: "Bcrypt costo 10. json:'-' en Go (nunca serializado)"]
+  created_at timestamp [default: `NOW()`]
+  updated_at timestamp [default: `NOW()`]
+
+  indexes {
+    email [unique]
+  }
+}
+
+Table documents {
+  id varchar(36) [pk, note: "UUID v4"]
+  user_id varchar(36) [not null]
+  name varchar(255) [not null]
+  type doc_type [not null]
+  status doc_status [default: "empty"]
+  file_path text [default: ""]
+  created_at timestamp [default: `NOW()`]
+  updated_at timestamp [default: `NOW()`]
+
+  indexes {
+    user_id [name: "idx_documents_user"]
+  }
+}
+
+Table properties {
+  id varchar(36) [pk, note: "UUID v4"]
+  title varchar(255) [not null]
+  price decimal(12,2) [not null, note: "CLP o UF-equivalente"]
+  currency varchar(10) [default: "CLP"]
+  sqm int [not null]
+  location varchar(255) [not null, note: "Comuna + Región"]
+  lat decimal(10,6)
+  lng decimal(10,6)
+  image text [note: "URL de imagen principal"]
+  description text
+  available boolean [default: true, note: "Disponibilidad/vacancia del local"]
+
+  // ── Especificaciones técnicas (7 dimensiones del matcher) ──
+  has_gas boolean [default: false]
+  power_capacity power_capacity [default: "Básica"]
+  water_connection boolean [default: false]
+  grease_trap boolean [default: false]
+  frontage_size int [default: 0, note: "Metros lineales de frente comercial"]
+  foot_traffic foot_traffic [default: "Bajo"]
+  permitted_uses text[] [note: "Array de rubros permitidos. Hard rule: score cap 29% si rubro ∉ "]
+
+  // ── Metadata ──
+  nearby_pois text[] [note: "Puntos de interés cercanos"]
+  past_business text [note: "Qué negocio funcionó antes en el local"]
+  renovation_needed text [note: "Tipo de remodelación requerida"]
+  owner_notes text
+  negotiable boolean [default: false, note: "Precio negociable sí/no"]
+  neighborhood_insights text
+
+  // ── Ownership ──
+  owner_id varchar(36) [note: "FK a users. Agregado en migración 002"]
+
+  created_at timestamp [default: `NOW()`]
+  updated_at timestamp [default: `NOW()`]
+
+  indexes {
+    permitted_uses [type: GIN, name: "idx_properties_permitted"]
+    owner_id [name: "idx_properties_owner"]
+    price [note: "Pendiente: idx_properties_price (Agosto)"]
+    sqm [note: "Pendiente: idx_properties_sqm (Agosto)"]
+    location [note: "Pendiente: idx_properties_location (Agosto)"]
+  }
+}
+
+Table matches {
+  id varchar(36) [pk, note: "UUID v4"]
+  user_id varchar(36) [not null]
+  property_id varchar(36) [not null]
+  rubro varchar(50) [note: "Rubro del emprendedor al momento del match"]
+  score int [note: "Score 0-100 (valor final * 100)"]
+  status match_status [default: "scored", note: "Outcome del match para recolección de labels (path a ML)"]
+  created_at timestamp [default: `NOW()`]
+  updated_at timestamp [default: `NOW()`]
+
+  indexes {
+    user_id [name: "idx_matches_user"]
+    property_id [name: "idx_matches_property"]
+    status [name: "idx_matches_status"]
+  }
+}
+
+Table leads {
+  id varchar(36) [pk, note: "UUID v4"]
+  user_id varchar(36) [not null, note: "Emprendedor que genera la interacción"]
+  property_id varchar(36) [not null]
+  type lead_type [not null]
+  status lead_status [default: "new"]
+  message text [note: "Mensaje opcional de postulación o contacto"]
+  created_at timestamp [default: `NOW()`]
+  updated_at timestamp [default: `NOW()`]
+
+  indexes {
+    user_id [name: "idx_leads_user"]
+    property_id [name: "idx_leads_property"]
+    status [name: "idx_leads_status"]
+  }
+}
+
+Table assessments {
+  id varchar(36) [pk, note: "UUID v4"]
+  user_id varchar(36) [not null]
+  user_type varchar(20) [not null]
+  step int [default: 0, note: "Paso actual del wizard de onboarding"]
+  data jsonb [default: "{}", note: "Respuestas del wizard (flexible por tipo de usuario)"]
+  completed boolean [default: false]
+  created_at timestamp [default: `NOW()`]
+  updated_at timestamp [default: `NOW()`]
+
+  indexes {
+    user_id [name: "idx_assessments_user"]
+  }
+}
+
+Table user_preferences {
+  id varchar(36) [pk, note: "UUID v4"]
+  user_id varchar(36) [not null, unique]
+  rubro varchar(50) [note: "Rubro de negocio preferido"]
+  max_budget decimal(12,2) [note: "Presupuesto máximo en CLP"]
+  min_size int [note: "M² mínimos"]
+  max_size int [note: "M² máximos"]
+  commune_id varchar(5) [note: "Código de comuna de preferencia"]
+  preferred_location text
+  created_at timestamp [default: `NOW()`]
+  updated_at timestamp [default: `NOW()`]
+}
+
+Table chat_history {
+  id serial [pk]
+  user_id varchar(36) [not null]
+  role chat_role [not null]
+  content text [not null]
+  created_at timestamp [default: `NOW()`]
+
+  indexes {
+    user_id [name: "idx_chat_user"]
+  }
+
+  note: "ON HOLD — Pendiente decisión de proveedor LLM"
+}
+
+Table static_trends {
+  id serial [pk]
+  city varchar(100) [not null, unique, note: "Ciudad del reporte de mercado"]
+  avg_price_sqm numeric(10,2) [not null, note: "Precio promedio por m² (UF o moneda local)"]
+  currency varchar(10) [default: "UF"]
+  demand_level varchar(10) [not null, note: "CHECK (demand_level IN ('Alta','Media','Baja'))"]
+  summary text
+  source varchar(255) [note: "Fuente trazable (ej. Colliers Q2 2026)"]
+  updated_at timestamp [default: `NOW()`]
+
+  note: "Tendencias curadas sin LLM — ver docs/trends/ALTERNATIVAS_SIN_IA.md"
+}
+
+Table static_trends_monthly {
+  id serial [pk]
+  city varchar(100) [not null]
+  month varchar(10) [not null, note: "ej. Ene, Feb"]
+  growth numeric(5,2) [note: "Porcentaje de crecimiento mensual"]
+
+  indexes {
+    (city, month) [unique]
+  }
+}
+
+// ─── RELACIONES ───────────────────────────────────────────────────
+
+Ref: users.id < documents.user_id          // 1:N — Un usuario tiene múltiples documentos
+Ref: users.id < properties.owner_id         // 1:N — Un propietario publica múltiples inmuebles
+Ref: users.id < matches.user_id             // 1:N — Un emprendedor genera múltiples matches
+Ref: users.id < assessments.user_id         // 1:N — Un usuario tiene múltiples sesiones de assessment
+Ref: users.id - user_preferences.user_id    // 1:1 — Un usuario tiene un solo set de preferencias
+Ref: users.id < chat_history.user_id        // 1:N — Un usuario tiene múltiples mensajes de chat
+Ref: properties.id < matches.property_id    // 1:N — Una propiedad recibe múltiples matches
+Ref: users.id < leads.user_id               // 1:N — Un emprendedor genera múltiples interacciones
+Ref: properties.id < leads.property_id      // 1:N — Una propiedad recibe múltiples interacciones
+Ref: static_trends.city < static_trends_monthly.city // 1:N — Una ciudad tiene serie mensual
+
+// ─── NOTAS ────────────────────────────────────────────────────────
+// 1. Todas las FKs tienen ON DELETE CASCADE excepto owner_id en properties
+// 2. Los UUID v4 se generan server-side con crypto/rand (Go)
+// 3. El campo score en matches almacena el valor 0-100 del score final
+// 4. assessments.data usa JSONB para flexibilidad en las preguntas del wizard
+// 5. chat_history es placeholder; no se escribe desde el handler actual
+// 6. matches.status permite recolectar labels (closed_won/closed_lost) para el path a ML
+// 7. leads registra guardados, postulaciones y solicitudes de contacto (HU21)
+// 8. static_trends / static_trends_monthly alimentan GET /api/trends sin LLM (HU23)

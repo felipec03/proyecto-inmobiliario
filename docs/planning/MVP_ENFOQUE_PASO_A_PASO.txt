@@ -1,0 +1,169 @@
+
+MiLocal
+Propuesta de enfoque MVP y plan de ejecución
+Documento base para discutir alcance, prioridades y uso de recursos durante la primera etapa de ejecución.
+Principio central
+Construir lo mínimo necesario para validar el comportamiento real de oferta, demanda y compatibilidad antes de invertir en automatización avanzada.
+
+1. Qué queremos validar en esta etapa
+La primera etapa de MiLocal no busca construir desde el día uno toda la visión tecnológica futura. El objetivo es validar, con usuarios reales, que existe valor en conectar de manera más inteligente a emprendedores que buscan un espacio comercial con propietarios que buscan un arrendatario compatible.
+La hipótesis a probar es simple: si capturamos información estructurada de ambos lados, podemos generar recomendaciones de compatibilidad mejores que una búsqueda inmobiliaria tradicional basada solo en precio, ubicación y metros cuadrados.
+Validar que los emprendedores están dispuestos a completar un perfil y declarar qué tipo de local necesitan.
+Validar que los propietarios están dispuestos a publicar su local y describir qué tipo de arrendatario buscan.
+Identificar qué variables explican mejor una buena compatibilidad entre ambas partes.
+Medir si los matches generan interés, contactos, visitas y eventualmente operaciones.
+Construir una base de datos propia que permita evolucionar posteriormente hacia un motor automatizado de matching.
+2. Qué sería el MVP
+El MVP puede presentarse al usuario como un portal inmobiliario comercial sencillo. La diferencia es que cada usuario y cada propiedad tendrán información estructurada detrás, que permitirá a MiLocal aprender y generar compatibilidades.
+Componente
+Función en el MVP
+Portal público
+Buscador y catálogo de locales comerciales disponibles.
+Perfil emprendedor
+Registro y assessment breve sobre negocio, presupuesto, ubicación, tamaño y requerimientos.
+Perfil propietario
+Registro y assessment sobre inmueble, renta, estado y perfil de arrendatario deseado.
+Publicación de local
+Flujo simple para ingresar una propiedad y sus principales características.
+Preferencias
+Registro de lo que cada lado busca y de sus restricciones principales.
+Backoffice MiLocal
+Vista interna para administrar usuarios, inmuebles, variables, leads y estado de cada match.
+Matching V1
+Cruce de variables mediante reglas simples y apoyo manual del equipo.
+Interés y contacto
+Acciones para guardar, postular, solicitar contacto o manifestar interés por un local/perfil.
+3. Cómo funcionaría la experiencia
+El MVP debe ser entendible para cualquier usuario sin explicar previamente el concepto de motor de matching. La propuesta visible es simple: buscar o publicar un local comercial. La inteligencia se construye por debajo.
+Paso 1. Captar al usuario
+El emprendedor llega buscando un local. El propietario llega queriendo publicar o encontrar un mejor arrendatario. Ambos deben tener una razón inmediata para entrar, sin exigirles entender toda la visión de MiLocal.
+Paso 2. Crear perfil y completar assessment
+Antes o durante la búsqueda/publicación, cada usuario completa un formulario breve. La información debe ser suficiente para segmentar y comparar, pero no tan extensa como para frenar la conversión.
+Paso 3. Estructurar la información
+Cada respuesta debe almacenarse como una variable utilizable. El foco no está solo en recopilar leads, sino en construir una base estructurada de oferta, demanda y preferencias.
+Paso 4. Generar matches V1
+En una primera versión, la compatibilidad puede calcularse con reglas simples, ponderaciones y revisión humana. No es necesario automatizar todo desde el comienzo.
+Paso 5. Acompañar y medir
+MiLocal observa qué recomendaciones generan interés, contactos, visitas, descartes y operaciones. También registra por qué un match funcionó o no.
+Paso 6. Aprender e iterar
+Con evidencia real, se ajustan preguntas, variables, ponderaciones, experiencia del portal y propuesta de valor. El aprendizaje de esta etapa define qué merece ser automatizado después.
+4. Variables mínimas a capturar
+El diseño del MVP debe cuidar especialmente la calidad de la información. Aunque la interfaz sea simple, los datos deben quedar preparados para alimentar el futuro motor de compatibilidad.
+Perfil
+Variable
+Perfil
+Variable
+Emprendedor
+Rubro o actividad
+Propietario / Local
+Ubicación y dirección
+
+Etapa del negocio
+
+Metros cuadrados
+
+Presupuesto máximo de arriendo
+
+Renta solicitada
+
+Comunas o zonas preferidas
+
+Estado del inmueble
+
+Rango de m² requerido
+
+Infraestructura disponible
+
+Requerimientos técnicos
+
+Rubros permitidos o deseados
+
+Nivel de formalización
+
+Perfil de arrendatario buscado
+
+Características críticas
+
+Disponibilidad / vacancia
+Criterio de diseño: si una pregunta no ayuda a segmentar, priorizar, descartar o explicar una compatibilidad, probablemente no debería estar en el assessment inicial.
+5. Qué NO es necesario construir ahora
+Para esta primera etapa conviene evitar sobredimensionar el desarrollo. La automatización debe responder a aprendizajes reales, no a supuestos.
+No es indispensable construir un motor de IA propio desde el inicio.
+No es indispensable integrar múltiples APIs o fuentes externas durante el MVP.
+No es indispensable automatizar el 100% del scoring y del matching.
+No es indispensable desarrollar una arquitectura pensada para millones de usuarios desde el primer mes.
+No es indispensable construir todas las funcionalidades imaginadas para la visión final de MiLocal.
+Sí es indispensable que el MVP permita capturar datos, observar comportamiento, generar matches, medir resultados y aprender rápido.
+6. Roadmap genérico de 10 meses
+Periodo
+Foco
+Resultado esperado
+Meses 1-2
+Diseño y construcción base
+Definir assessments, variables, flujos, base de datos y construir la primera versión navegable del portal.
+Meses 3-4
+Carga inicial y prueba controlada
+Incorporar primeros usuarios y propiedades, probar publicación, búsqueda, perfiles y backoffice.
+Meses 5-6
+Matching y validación
+Aplicar reglas de compatibilidad, generar primeros matches, acompañar usuarios y registrar resultados.
+Meses 7-8
+Iteración y adquisición
+Ajustar variables, mejorar experiencia, aumentar oferta y demanda y probar canales de captación.
+Meses 9-10
+Consolidación y evidencia
+Medir resultados, identificar patrones, documentar aprendizajes y definir la siguiente etapa tecnológica y comercial.
+7. Indicadores para saber si el MVP está funcionando
+Más que medir solamente tráfico o registros, conviene seguir un embudo que refleje si MiLocal está generando compatibilidad y movimiento real en el mercado.
+Dimensión
+Qué observar
+Adquisición
+Usuarios que llegan al portal y fuente de origen.
+Activación
+Usuarios que completan su perfil/assessment.
+Oferta
+Locales publicados y porcentaje con información completa.
+Demanda
+Emprendedores con búsqueda activa y preferencias definidas.
+Matching
+Número de compatibilidades generadas y calidad percibida.
+Interés
+Guardados, postulaciones, solicitudes de contacto o respuestas.
+Conversión
+Visitas coordinadas, negociaciones y operaciones concretadas.
+Aprendizaje
+Variables que explican aceptación o descarte de un match.
+8. Cómo conecta esta etapa con la visión futura
+El MVP no reemplaza la visión tecnológica de MiLocal. La ordena en etapas. Primero se valida el comportamiento y se construye información propia; después se automatizan los procesos que demostraron valor.
+Etapa
+Qué incorpora
+Objetivo
+MiLocal 1.0
+Portal + perfiles + assessment + datos + matching simple
+Validar problema, comportamiento y variables.
+MiLocal 2.0
+Motor automatizado de compatibilidad + scoring
+Escalar un proceso ya probado.
+MiLocal Intelligence
+IA + APIs + datos territoriales + factibilidad + riesgo + recomendaciones avanzadas
+Transformar la plataforma en inteligencia comercial inmobiliaria escalable.
+9. Implicancia para el presupuesto
+Bajo este enfoque, el presupuesto debe priorizar cuatro cosas: equipo dedicado, construcción de un MVP funcional pero acotado, levantamiento de oferta y demanda, y validación en terreno. El desarrollo tecnológico avanzado puede quedar como una segunda etapa financiable una vez que exista evidencia real.
+Equipo: ejecutar, levantar usuarios, acompañar pilotos y convertir aprendizajes en decisiones.
+Producto: construir y mantener el portal, perfiles, publicación, backoffice y matching V1.
+Validación: reclutar usuarios, probar hipótesis, coordinar contactos/visitas y medir resultados.
+Operación: herramientas, hosting, servicios, legal, contabilidad y costos de ejecución indispensables.
+Idea rectora para discutir el presupuesto: cada partida debería poder vincularse directamente con construir el MVP, conseguir usuarios, generar matches o aprender algo que reduzca incertidumbre del modelo.
+10. Preguntas que los socios deberían cerrar antes de ejecutar
+¿Qué funcionalidades son realmente imprescindibles para lanzar la primera versión?
+¿Qué variables del assessment entran desde el inicio y cuáles pueden esperar?
+¿Qué parte del matching será automática y qué parte será manual?
+¿Quién será responsable de captar propietarios y quién de captar emprendedores?
+¿Qué métricas definiremos como evidencia de validación al mes 5 y al mes 10?
+¿Qué presupuesto máximo queremos destinar al desarrollo inicial?
+¿Qué tareas pueden ejecutar los socios y cuáles deben externalizarse?
+¿Qué evidencia queremos tener al terminar para justificar una segunda ronda/fondo orientado a IA, APIs y escalamiento tecnológico?
+Conclusión
+La primera versión de MiLocal puede ser deliberadamente sencilla. Su valor no dependerá de tener la tecnología más sofisticada, sino de ser capaz de capturar mejor información que un portal tradicional, transformar esa información en compatibilidades y comprobar que esas compatibilidades generan mejores decisiones.
+El objetivo de estos 10 meses debería ser terminar con un producto utilizado por personas reales, una base estructurada de oferta y demanda, evidencia de qué variables importan y un proceso de matching que ya haya demostrado valor. Con esa evidencia, la siguiente etapa tecnológica puede construirse con mucho menor riesgo y una justificación mucho más sólida.
+Secuencia propuesta:  Capturar → Estructurar → Matchear → Acompañar → Medir → Aprender → Automatizar.
